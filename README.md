@@ -2,6 +2,14 @@
 
 Play With Me 是一个 Godot 4.6 横屏移动端桌游应用。当前核心玩法是狼人杀，支持局域网大厅、创建房间、扫码加入、WebSocket 房间同步、断线重连、AI 机器人、偏好设置、模型配置、TTS 播报、复盘和 Android 原生能力。
 
+## 游戏截图
+
+<p>
+  <img src="demo/1.png" alt="游戏截图 1" width="32%" />
+  <img src="demo/2.png" alt="游戏截图 2" width="32%" />
+  <img src="demo/3.png" alt="游戏截图 3" width="32%" />
+</p>
+
 ## TODO
 
 - [ ] 本机 + AI 一起游戏
