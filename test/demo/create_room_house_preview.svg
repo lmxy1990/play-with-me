@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="roof" x1="14" y1="14" x2="50" y2="35" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f2ad63"/>
+      <stop offset="0.52" stop-color="#d86f35"/>
+      <stop offset="1" stop-color="#a84b25"/>
+    </linearGradient>
+    <linearGradient id="wall" x1="18" y1="28" x2="48" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff1c9"/>
+      <stop offset="1" stop-color="#eec57a"/>
+    </linearGradient>
+    <linearGradient id="door" x1="26" y1="38" x2="38" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#92d6df"/>
+      <stop offset="1" stop-color="#4c9eb5"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="1.4" flood-color="#5b2e0b" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+  <g filter="url(#softShadow)" stroke-linecap="round" stroke-linejoin="round">
+    <path
+      d="M14 30.2 32 14.6l18 15.6v21.6a3.2 3.2 0 0 1-3.2 3.2H17.2a3.2 3.2 0 0 1-3.2-3.2Z"
+      fill="url(#wall)"
+      stroke="#6a3a10"
+      stroke-width="3.2"/>
+    <path
+      d="M10.5 31.5 32 12.5l21.5 19"
+      fill="none"
+      stroke="#6a3a10"
+      stroke-width="4.8"/>
+    <path
+      d="M13.8 29.8 32 13.8l18.2 16"
+      fill="none"
+      stroke="url(#roof)"
+      stroke-width="9.2"/>
+    <path
+      d="M19.5 28.2 32 17.6 44.5 28.2"
+      fill="none"
+      stroke="#ffd991"
+      stroke-width="2.1"
+      opacity="0.74"/>
+    <path
+      d="M26 55V43.5a6 6 0 0 1 12 0V55Z"
+      fill="url(#door)"
+      stroke="#2f6f82"
+      stroke-width="2.6"/>
+    <circle cx="35.2" cy="48" r="1.3" fill="#ffe6a5"/>
+    <path
+      d="M32 20.5v9.5M27.2 25.2h9.6"
+      fill="none"
+      stroke="#fff1c9"
+      stroke-width="3.2"/>
+    <path
+      d="M20.2 35.8h8.2v7.3h-8.2Z"
+      fill="#bfe9f7"
+      stroke="#5e330a"
+      stroke-width="2.1"/>
+    <path
+      d="M23.2 36.2v6.5M20.6 39.5h7.4"
+      stroke="#eefcff"
+      stroke-width="1.2"/>
+    <path
+      d="M39.6 35.8h4.9"
+      stroke="#fff7d8"
+      stroke-width="2.5"
+      opacity="0.72"/>
+  </g>
+</svg>

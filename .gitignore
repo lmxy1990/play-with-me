@@ -1,0 +1,29 @@
+# Godot local cache
+.godot/
+.godot_user/
+
+# User-excluded project folders
+docs/
+scripts/
+android_plugins/
+
+# Build and export outputs
+builds/
+exports/
+temp/
+android/build/
+addons/play_with_me_android/bin/
+
+# Packaged binaries and generated archives
+*.apk
+*.aab
+*.hprof
+classes.jar
+
+# Logs
+*.log
+
+# Local signing credentials
+*.keystore
+*.jks
+*.p12

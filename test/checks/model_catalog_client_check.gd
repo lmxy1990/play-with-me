@@ -1,0 +1,26 @@
+extends SceneTree
+
+
+func _initialize() -> void:
+	var client = load("res://scripts/core/model/model_catalog_client.gd").new()
+	assert(client._models_url("ollama", "http://127.0.0.1:11434") == "http://127.0.0.1:11434/api/tags")
+	assert(client._models_url("ollama", "http://127.0.0.1:11434/api") == "http://127.0.0.1:11434/api/tags")
+	assert(client._models_url("openai", "https://api.example.local/v1") == "https://api.example.local/v1/models")
+	assert(client._models_url("openai", "https://api.example.local/v1/chat/completions") == "https://api.example.local/v1/models")
+	assert(client._endpoint_hint("openai", "https://api.example.local/models", "<html><title>Gateway</title>") == "BaseUrl 可能缺少 /v1；")
+	assert(client._endpoint_hint("openai", "https://api.example.local/v1/models", "<html>") == "")
+	assert(client._models_url("anthropic", "https://api.anthropic.com/v1/messages") == "https://api.anthropic.com/v1/models")
+	assert(client._models_url("gemini", "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent") == "https://generativelanguage.googleapis.com/v1beta/models")
+	var ollama_models: Array = client._parse_models("ollama", {"models": [{"name": "qwen2.5:7b"}, {"model": "llama3.1"}]})
+	assert(ollama_models.size() == 2)
+	assert(String(ollama_models[0]["id"]) == "llama3.1")
+	var openai_models: Array = client._parse_models("openai", {"data": [{"id": "gpt-a", "owned_by": "local"}, {"id": "gpt-b"}]})
+	assert(openai_models.size() == 2)
+	assert(String(openai_models[0]["id"]) == "gpt-a")
+	var gemini_models: Array = client._parse_models("gemini", {"models": [{"name": "models/gemini-1.5-flash", "displayName": "Gemini Flash", "supportedGenerationMethods": ["generateContent"]}, {"name": "models/embed", "supportedGenerationMethods": ["embedContent"]}]})
+	assert(gemini_models.size() == 1)
+	assert(String(gemini_models[0]["id"]) == "gemini-1.5-flash")
+	var anthropic_models: Array = client._parse_models("anthropic", {"data": [{"id": "claude-3-5-sonnet", "display_name": "Claude Sonnet"}]})
+	assert(anthropic_models.size() == 1)
+	assert(String(anthropic_models[0]["display_name"]) == "Claude Sonnet")
+	quit()

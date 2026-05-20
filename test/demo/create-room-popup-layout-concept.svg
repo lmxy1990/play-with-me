@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1420"/>
+      <stop offset="1" stop-color="#17100b"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#d6e5ff" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#d6e5ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f1c65b"/>
+      <stop offset=".22" stop-color="#7b4a12"/>
+      <stop offset=".55" stop-color="#c98b28"/>
+      <stop offset="1" stop-color="#3b2108"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6c4518"/>
+      <stop offset=".48" stop-color="#2c1908"/>
+      <stop offset="1" stop-color="#8b5b1e"/>
+    </linearGradient>
+    <linearGradient id="goldButton" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset=".5" stop-color="#c78324"/>
+      <stop offset="1" stop-color="#5a310c"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#000" flood-opacity=".56"/>
+    </filter>
+    <filter id="smallShadow" x="-30%" y="-40%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#ffcf55" flood-opacity=".65"/>
+    </filter>
+    <style>
+      .goldText { fill:#ffe39a; font-family:"Microsoft YaHei", "Noto Sans CJK SC", sans-serif; font-weight:700; }
+      .softText { fill:#cfa85a; font-family:"Microsoft YaHei", "Noto Sans CJK SC", sans-serif; font-weight:700; }
+      .darkText { fill:#1d1005; font-family:"Microsoft YaHei", "Noto Sans CJK SC", sans-serif; font-weight:800; }
+      .line { stroke:#f2bd4b; stroke-opacity:.45; stroke-width:2; }
+      .thin { stroke:#ffdf82; stroke-opacity:.34; stroke-width:1.2; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <circle cx="615" cy="118" r="110" fill="url(#moon)" opacity=".58"/>
+  <path d="M0 470 C170 390 245 430 382 365 C545 286 660 365 801 305 C950 242 1120 310 1280 238 L1280 720 L0 720Z" fill="#091018" opacity=".82"/>
+  <path d="M0 515 C160 456 270 500 395 442 C553 370 697 445 820 386 C1000 299 1110 394 1280 332 L1280 720 L0 720Z" fill="#15100b" opacity=".92"/>
+  <rect width="1280" height="720" fill="#000" opacity=".38"/>
+
+  <g filter="url(#shadow)">
+    <path d="M198 110 H612 C632 110 648 126 648 146 V592 C648 612 632 628 612 628 H198 C178 628 162 612 162 592 V146 C162 126 178 110 198 110Z" fill="url(#metal)"/>
+    <path d="M668 110 H1082 C1102 110 1118 126 1118 146 V592 C1118 612 1102 628 1082 628 H668 C648 628 632 612 632 592 V146 C632 126 648 110 668 110Z" fill="url(#metal)"/>
+    <path d="M218 132 H594 C611 132 624 145 624 162 V576 C624 593 611 606 594 606 H218 C201 606 188 593 188 576 V162 C188 145 201 132 218 132Z" fill="url(#plate)" stroke="#f7cf6b" stroke-width="3"/>
+    <path d="M686 132 H1062 C1079 132 1092 145 1092 162 V576 C1092 593 1079 606 1062 606 H686 C669 606 656 593 656 576 V162 C656 145 669 132 686 132Z" fill="url(#plate)" stroke="#f7cf6b" stroke-width="3"/>
+    <rect x="620" y="110" width="40" height="518" rx="18" fill="#211004" stroke="#f0be4c" stroke-opacity=".42" stroke-width="2"/>
+    <path d="M640 126 V612" stroke="#f7cf6b" stroke-opacity=".32" stroke-width="3"/>
+  </g>
+
+  <g opacity=".65">
+    <path d="M224 172 H588" class="thin"/>
+    <path d="M224 278 H588" class="thin"/>
+    <path d="M224 420 H588" class="thin"/>
+    <path d="M694 198 H1056" class="thin"/>
+    <path d="M694 554 H1056" class="thin"/>
+  </g>
+
+  <g filter="url(#smallShadow)">
+    <rect x="234" y="204" width="132" height="42" rx="21" fill="#2b1707" stroke="#e7ad38" stroke-width="2"/>
+    <circle cx="260" cy="225" r="13" fill="#ffcd44" filter="url(#glow)"/>
+    <circle cx="260" cy="225" r="6" fill="#fff0a8"/>
+    <text x="286" y="231" class="goldText" font-size="21">狼人杀</text>
+
+    <rect x="234" y="320" width="82" height="40" rx="20" fill="#c98925" stroke="#ffe081" stroke-width="2"/>
+    <circle cx="258" cy="340" r="11" fill="#fff0a8"/>
+    <text x="278" y="346" class="darkText" font-size="19">6席</text>
+    <rect x="334" y="320" width="82" height="40" rx="20" fill="#2b1707" stroke="#e0a941" stroke-width="2"/>
+    <circle cx="358" cy="340" r="10" fill="none" stroke="#dba646" stroke-width="3"/>
+    <text x="378" y="346" class="goldText" font-size="19">7席</text>
+    <rect x="434" y="320" width="82" height="40" rx="20" fill="#2b1707" stroke="#e0a941" stroke-width="2"/>
+    <circle cx="458" cy="340" r="10" fill="none" stroke="#dba646" stroke-width="3"/>
+    <text x="478" y="346" class="goldText" font-size="19">8席</text>
+    <rect x="234" y="376" width="82" height="40" rx="20" fill="#2b1707" stroke="#e0a941" stroke-width="2"/>
+    <circle cx="258" cy="396" r="10" fill="none" stroke="#dba646" stroke-width="3"/>
+    <text x="278" y="402" class="goldText" font-size="19">9席</text>
+
+    <rect x="234" y="462" width="330" height="48" rx="12" fill="#1b0e04" stroke="#e7ad38" stroke-width="2"/>
+    <circle cx="266" cy="486" r="22" fill="#bb7c1f" stroke="#ffe081" stroke-width="2"/>
+    <path d="M256 490 A10 10 0 1 1 263 493 L258 498 H253 V503 H247 V508 H239 V501 L256 484" fill="none" stroke="#ffe89b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="271" cy="477" r="3" fill="#fff2ad"/>
+    <text x="324" y="493" class="softText" font-size="22" opacity=".55">••••</text>
+  </g>
+
+  <g>
+    <text x="874" y="184" class="goldText" font-size="20" text-anchor="middle">预女猎 · 节奏稳定</text>
+    <text x="874" y="213" class="softText" font-size="16" text-anchor="middle">信息清晰，适合作为默认首局</text>
+  </g>
+
+  <g filter="url(#smallShadow)">
+    <rect x="724" y="258" width="46" height="150" rx="12" fill="#2b1707" stroke="#e9b443" stroke-width="2"/>
+    <path d="M756 303 L734 333 L756 363" fill="none" stroke="#ffe28a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="978" y="258" width="46" height="150" rx="12" fill="#2b1707" stroke="#e9b443" stroke-width="2"/>
+    <path d="M992 303 L1014 333 L992 363" fill="none" stroke="#ffe28a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="790" y="238" width="168" height="206" rx="14" fill="#0e1b22" stroke="#f1c256" stroke-width="4"/>
+    <rect x="805" y="253" width="138" height="176" rx="8" fill="#142631" stroke="#875718" stroke-width="2"/>
+    <circle cx="884" cy="300" r="42" fill="#dbe8dc" opacity=".85"/>
+    <path d="M808 390 C842 352 862 374 889 339 C915 304 924 349 940 322 L943 429 H805Z" fill="#071015" opacity=".78"/>
+    <path d="M876 362 C884 336 894 320 906 305 C902 332 918 340 927 358 C905 346 893 361 876 362Z" fill="#020608"/>
+    <text x="874" y="478" class="goldText" font-size="20" text-anchor="middle">点击查看规则</text>
+  </g>
+
+  <g filter="url(#smallShadow)">
+    <rect x="730" y="504" width="84" height="34" rx="17" fill="#153b34" stroke="#51d1ba" stroke-width="2"/>
+    <text x="772" y="527" fill="#76ffe5" font-family="Microsoft YaHei, sans-serif" font-weight="700" font-size="16" text-anchor="middle">标准</text>
+    <rect x="832" y="504" width="96" height="34" rx="17" fill="#38240d" stroke="#ffcd63" stroke-width="2"/>
+    <text x="880" y="527" fill="#ffdf83" font-family="Microsoft YaHei, sans-serif" font-weight="700" font-size="16" text-anchor="middle">无警长</text>
+    <rect x="946" y="504" width="84" height="34" rx="17" fill="#372549" stroke="#c68cff" stroke-width="2"/>
+    <text x="988" y="527" fill="#d9b7ff" font-family="Microsoft YaHei, sans-serif" font-weight="700" font-size="16" text-anchor="middle">6-9席</text>
+  </g>
+
+  <g filter="url(#smallShadow)">
+    <rect x="872" y="562" width="184" height="50" rx="11" fill="url(#goldButton)" stroke="#ffe389" stroke-width="3"/>
+    <text x="964" y="595" class="darkText" font-size="25" text-anchor="middle">确认</text>
+  </g>
+
+  <g filter="url(#smallShadow)">
+    <circle cx="1138" cy="100" r="28" fill="#291407" stroke="#f3c65b" stroke-width="3"/>
+    <path d="M1127 89 L1149 111 M1149 89 L1127 111" stroke="#ffdc7a" stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>
