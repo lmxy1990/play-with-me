@@ -117,7 +117,7 @@ func _initialize() -> void:
 	room._center_speech_pending_items.clear()
 	room._center_speech_deferred_history_items.clear()
 	var display_item := {"speaker": "2号 mimo-v2.5", "speaker_index": 1, "text": "投票给 3号 kimi-k2.6。", "at": 9.5}
-	var tts_item: Dictionary = room._tts_history_controller.build_item(display_item, {"enabled": true, "engine": "system"}, room._players.size())
+	var tts_item: Dictionary = room._player_speech_output.build_item(display_item, {"enabled": true, "engine": "system"}, room._players.size())
 	room._show_center_speech_item_from_history(display_item, true)
 	if not _expect(room._center_speech_items.size() == 1, "tts queued history appears in center panel before playback starts"):
 		return

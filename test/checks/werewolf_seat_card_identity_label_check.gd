@@ -8,6 +8,7 @@ func _initialize() -> void:
 		"name": "deepseek-v4-flash",
 		"owner": "bot",
 		"role": "狼人",
+		"role_title": "夜行者",
 		"role_visible": true,
 		"avatar": "res://assets/images/werewolf/avatars/robot.png",
 		"alive": true,
@@ -18,7 +19,7 @@ func _initialize() -> void:
 
 	if not _expect(_label_text(visible_card, "SeatNumberBadge") == "1号", "occupied card always shows seat number badge"):
 		return
-	if not _expect(_label_text(visible_card, "Title") == "1号 · 狼人", "occupied card shows seat number and role"):
+	if not _expect(_label_text(visible_card, "Title") == "1号 · 狼人 · 夜行者", "occupied card shows seat number, role and role title"):
 		return
 	if not _expect(_label_text(visible_card, "NameLabel") == "deepseek-v4-flash", "occupied card shows nickname"):
 		return
@@ -33,13 +34,14 @@ func _initialize() -> void:
 		return
 	if not _expect(_direct_child_count(visible_card, "NameLabel") == 1, "seat rebuild keeps exactly one nickname label"):
 		return
-	if not _expect(_label_text(visible_card, "Title") == "1号 · 狼人", "seat rebuild preserves role label"):
+	if not _expect(_label_text(visible_card, "Title") == "1号 · 狼人 · 夜行者", "seat rebuild preserves role label and title"):
 		return
 
 	var badge_card := _seat_card(1, {
 		"name": "角标玩家",
 		"owner": "bot",
 		"role": "守卫",
+		"role_title": "守夜人",
 		"role_visible": true,
 		"avatar": "",
 		"alive": true,
@@ -67,6 +69,7 @@ func _initialize() -> void:
 		"displayName": "联网玩家",
 		"owner": "human",
 		"role": "预言家",
+		"role_title": "洞察者",
 		"role_visible": false,
 		"avatar": "",
 		"alive": true,
@@ -79,6 +82,11 @@ func _initialize() -> void:
 	if not _expect(_label_text(hidden_card, "Title") == "3号 · 未知", "hidden-role card does not leak role"):
 		return
 	if not _expect(_label_text(hidden_card, "NameLabel") == "联网玩家", "hidden-role card uses displayName fallback"):
+		return
+
+	hidden_card.data["alive"] = false
+	hidden_card.start_motion(SeatCardScript.SeatMotion.DEAD)
+	if not _expect(_label_text(hidden_card, "Title") == "3号 · 未知", "dead hidden-role card does not reveal role"):
 		return
 
 	var empty_card := _seat_card(4, {

@@ -19,6 +19,18 @@ func _initialize() -> void:
 	assert(client._endpoint_hint("openai", "https://api.example.local/v1/chat/completions", "<!doctype html>") == "")
 	assert(client._request_result_label(HTTPRequest.RESULT_TIMEOUT) == "RESULT_TIMEOUT")
 	assert(client._request_result_error(HTTPRequest.RESULT_TIMEOUT, "https://api.example.local/v1/chat/completions") == "模型请求失败：请求超时(RESULT_TIMEOUT/13) url=https://api.example.local/v1/chat/completions")
+	assert(client._max_retries_from_request({}, {}) == 3)
+	assert(client._max_retries_from_request({"max_retries": 1}, {}) == 1)
+	assert(client._max_retries_from_request({"options": {"retry_count": 2}}, client._request_options_from_request({"options": {"retry_count": 2}})) == 2)
+	assert(client._retry_delay_for_attempt(1, 0.75, 6.0) == 0.75)
+	assert(client._retry_delay_for_attempt(4, 0.75, 3.0) == 3.0)
+	assert(client._retryable_request_result(HTTPRequest.RESULT_TIMEOUT))
+	assert(client._retryable_request_result(HTTPRequest.RESULT_CANT_CONNECT))
+	assert(not client._retryable_request_result(HTTPRequest.RESULT_BODY_SIZE_LIMIT_EXCEEDED))
+	assert(client._retryable_http_response_code(408))
+	assert(client._retryable_http_response_code(429))
+	assert(client._retryable_http_response_code(503))
+	assert(not client._retryable_http_response_code(400))
 	assert(client._model_family_matches("deepseek-v4-flash", "deepseek"))
 	assert(client._model_family_matches("vendor/glm-5.1", "glm"))
 	assert(client._model_family_matches("glm5.1", "glm"))
@@ -28,6 +40,12 @@ func _initialize() -> void:
 	assert(client._model_family_matches("moonshot-v1-8k", "moonshot"))
 	assert(client._model_family_matches("doubao-seed-2.0-pro", "doubao"))
 	assert(client._model_family_matches("notdeepseek-v4", "deepseek"))
+	var adapter_registry = load("res://scripts/core/model/model_adapter_registry.gd").new()
+	var glm_auto_formt_candidates: Array = adapter_registry.formt_adapter_test_candidates("openai_api", "glm-5.1", "auto")
+	assert(String(glm_auto_formt_candidates[0]) == "openai_json_schema")
+	assert(glm_auto_formt_candidates.has("openai_tool_forced"))
+	assert(String(glm_auto_formt_candidates[glm_auto_formt_candidates.size() - 1]) == "openai_json_object")
+	assert(String(adapter_registry.default_openai_formt_adapter("glm-5.1")) == "openai_tool_forced")
 	assert(client._chat_url("anthropic", "https://api.anthropic.com/v1") == "https://api.anthropic.com/v1/messages")
 	assert(client._chat_url("gemini", "https://generativelanguage.googleapis.com/v1beta", "gemini-1.5-flash") == "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
 	assert(client._parse_content("ollama", {"message": {"content": "白天先听发言。"}}) == "白天先听发言。")
@@ -67,6 +85,38 @@ func _initialize() -> void:
 	client.protocol_event.connect(func(request_id: int, event: Dictionary):
 		protocol_events.append({"request_id": request_id, "event": event.duplicate(true)})
 	)
+	_checkpoint("retry_policy")
+	var completed_events := []
+	client.completed.connect(func(request_id: int, ok: bool, content: String, error: String):
+		completed_events.append({"request_id": request_id, "ok": ok, "content": content, "error": error})
+	)
+	var retry_request_id := 700
+	client._pending[retry_request_id] = {
+		"request_id": retry_request_id,
+		"provider": "openai",
+		"url": "https://api.example.local/v1/chat/completions",
+		"headers": ["Content-Type: application/json"],
+		"payload": {"model": "qwen:test", "messages": [{"role": "user", "content": "hello"}]},
+		"timeout_sec": 1.0,
+		"model": "qwen:test",
+		"reasoning": false,
+		"connection_test": false,
+		"debug_context": {"provider": "openai", "model": "qwen:test", "transport_mode": "sync", "output_type": "text"},
+		"attempt": 1,
+		"max_retries": 3,
+		"retry_delay_sec": 30.0,
+		"retry_max_delay_sec": 30.0,
+	}
+	client._on_request_completed(HTTPRequest.RESULT_TIMEOUT, 0, PackedStringArray(), PackedByteArray(), retry_request_id, "openai")
+	assert(protocol_events.size() == 1)
+	var retry_event: Dictionary = (protocol_events[0] as Dictionary).get("event", {}) as Dictionary
+	assert(String(retry_event.get("type", "")) == "retry")
+	assert(int(retry_event.get("attempt", 0)) == 1)
+	assert(int(retry_event.get("next_attempt", 0)) == 2)
+	assert(int(retry_event.get("max_attempts", 0)) == 4)
+	assert(String(retry_event.get("result_label", "")) == "RESULT_TIMEOUT")
+	assert(completed_events.is_empty())
+	protocol_events.clear()
 	_checkpoint("stream_parsing")
 	var openai_stream_result: Dictionary = client._parse_stream_response(201, "openai", "data: {\"choices\":[{\"delta\":{\"content\":\"投\",\"reasoning_content\":\"想\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"票\"}}]}\n\ndata: [DONE]\n\n")
 	assert(bool(openai_stream_result.get("ok", false)))
@@ -251,8 +301,9 @@ func _initialize() -> void:
 		"options": request_options,
 		"purpose": "check",
 	}, "openai", "https://api.example.local/v1", "https://api.example.local/v1/chat/completions", "qwen:test", [], request_messages, response_schema, request_payload, 128, 0.3, 30.0, false, false)
-	assert(String(debug_context.get("api_key_raw", "")) == "sk-test")
 	assert(String(debug_context.get("api_key", "")) == "set")
+	assert(not debug_context.has("api_key_raw"))
+	assert(String(debug_context.get("api_key_debug", "")).contains("masked=sk-test"))
 	assert((debug_context.get("request_options", {}) as Dictionary).has("response_schema"))
 	assert(String(debug_context.get("reason_adapter", "")) == "minimax_reasoning_split")
 	assert(String(debug_context.get("output_adapter", "")) == "openai_json_schema")
@@ -264,6 +315,9 @@ func _initialize() -> void:
 	var explicit_tool_payload: Dictionary = client._payload("openai", "qwen:test", request_messages, 0.3, false, 128, {"response_schema": response_schema, "formt_adapter": "openai_tool_optional"})
 	client._apply_openai_compat_payload_adjustments(explicit_tool_payload, "openai", "https://api.example.local/v1", response_schema, false, "openai_tool_optional")
 	assert((explicit_tool_payload["tools"] as Array).size() == 1)
+	var explicit_tool_function: Dictionary = ((explicit_tool_payload["tools"] as Array)[0] as Dictionary)["function"] as Dictionary
+	assert(String(explicit_tool_function.get("description", "")) == "结构化输出。")
+	assert(not JSON.stringify(explicit_tool_payload).contains("complete model output"))
 	assert(not explicit_tool_payload.has("tool_choice"))
 	var explicit_deepseek_object_payload: Dictionary = client._payload("openai", "deepseek-v4-flash", request_messages, 0.3, false, 128, {"response_schema": response_schema, "formt_adapter": "openai_json_object"})
 	client._apply_openai_compat_payload_adjustments(explicit_deepseek_object_payload, "openai", "https://api.deepseek.com", response_schema, false, "openai_json_object")
@@ -276,10 +330,16 @@ func _initialize() -> void:
 	var explicit_glm_tool_payload: Dictionary = client._payload("openai", "glm-5.1", request_messages, 0.3, false, 128, {"response_schema": response_schema, "formt_adapter": "openai_tool_forced"})
 	client._apply_openai_compat_payload_adjustments(explicit_glm_tool_payload, "openai", "https://ark.cn-beijing.volces.com/api/plan/v3", response_schema, false, "openai_tool_forced")
 	assert((explicit_glm_tool_payload["tools"] as Array).size() == 1)
+	var explicit_glm_tool_function: Dictionary = ((explicit_glm_tool_payload["tools"] as Array)[0] as Dictionary)["function"] as Dictionary
+	assert(String(explicit_glm_tool_function.get("description", "")) == "结构化输出。")
+	assert(not JSON.stringify(explicit_glm_tool_payload).contains("complete model output"))
 	assert(String((explicit_glm_tool_payload["tool_choice"] as Dictionary).get("type", "")) == "function")
 	var explicit_minimax_tool_v2_payload: Dictionary = client._payload("openai", "minimax-m2.7", request_messages, 0.3, false, 128, {"response_schema": response_schema, "formt_adapter": "openai_tool_optional"})
 	client._apply_openai_compat_payload_adjustments(explicit_minimax_tool_v2_payload, "openai", "https://ark.cn-beijing.volces.com/api/plan/v3", response_schema, false, "openai_tool_optional")
 	assert((explicit_minimax_tool_v2_payload["tools"] as Array).size() == 1)
+	var explicit_minimax_tool_function: Dictionary = ((explicit_minimax_tool_v2_payload["tools"] as Array)[0] as Dictionary)["function"] as Dictionary
+	assert(String(explicit_minimax_tool_function.get("description", "")) == "结构化输出。")
+	assert(not JSON.stringify(explicit_minimax_tool_v2_payload).contains("complete model output"))
 	assert(not explicit_minimax_tool_v2_payload.has("tool_choice"))
 	assert(String(((explicit_minimax_tool_v2_payload["messages"] as Array)[0] as Dictionary).get("content", "")).contains("[MiniMax Tool Mode]"))
 	var explicit_general_reason_off_payload: Dictionary = client._payload("openai", "qwen:test", request_messages, 0.3, false, 128, {"reason_adapter": "native"})

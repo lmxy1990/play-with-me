@@ -3,15 +3,26 @@
 .godot_user/
 
 # User-excluded project folders
-docs/
-scripts/
-android_plugins/
+# Build caches and generated outputs inside source trees
+android_plugins/**/.gradle/
+android_plugins/**/.kotlin/
+android_plugins/**/.cxx/
+android_plugins/**/build/
+android_plugins/**/*.hprof
+
+android/build/.gradle/
+android/build/build/
+android/build/res/
+android/build/libs/
+android/build/src/main/assets/
+android/build/src/**/build/
+android/build/src/**/.gradle/
+android/build/src/**/.cxx/
 
 # Build and export outputs
 builds/
 exports/
 temp/
-android/build/
 addons/play_with_me_android/bin/
 
 # Packaged binaries and generated archives

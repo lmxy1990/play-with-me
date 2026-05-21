@@ -2,7 +2,7 @@ extends SceneTree
 
 
 func _initialize() -> void:
-	var parser = load("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_target_intent.gd").new()
+	var parser = load("res://scripts/player/werewolf/ai/ai_werewolf_target_intent.gd").new()
 	assert(int(parser.infer("我倾向今晚先处理 5号位，别拖。").get("seat_number", -1)) == 5)
 	assert(int(parser.infer("同意刀六号，白天再推票。").get("seat_number", -1)) == 6)
 	assert(int(parser.infer("3号可以杀，收益更高。").get("seat_number", -1)) == 3)

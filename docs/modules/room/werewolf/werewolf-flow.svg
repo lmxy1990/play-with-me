@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="900" viewBox="0 0 1180 900" role="img" aria-labelledby="title desc">
+  <title id="title">狼人杀房间运行主流程</title>
+  <desc id="desc">描述狼人杀房间从开局、中心展示、设备确认、通用玩家任务、接收设备真人或 AI 应答、规则校验、赛后处理到断线暂停恢复的主流程。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .page { fill: #f8fafc; }
+      .title { fill: #0f172a; font: 700 26px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; }
+      .subtitle { fill: #475569; font: 14px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; }
+      .node { fill: #ffffff; stroke: #334155; stroke-width: 1.4; rx: 10; }
+      .engine { fill: #e0f2fe; stroke: #0369a1; }
+      .device { fill: #fef3c7; stroke: #b45309; }
+      .ai { fill: #ede9fe; stroke: #7c3aed; }
+      .post { fill: #dcfce7; stroke: #15803d; }
+      .pause { fill: #fee2e2; stroke: #b91c1c; }
+      .gate { fill: #f1f5f9; stroke: #475569; stroke-dasharray: 6 4; }
+      .label { fill: #0f172a; font: 700 15px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; }
+      .small { fill: #334155; font: 12px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; }
+      .tiny { fill: #475569; font: 11px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; }
+      .arrow { fill: none; stroke: #334155; stroke-width: 1.7; marker-end: url(#arrow); }
+      .dash { fill: none; stroke: #64748b; stroke-width: 1.5; stroke-dasharray: 5 5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="page" x="0" y="0" width="1180" height="900"/>
+  <text class="title" x="40" y="46">狼人杀房间运行主流程</text>
+  <text class="subtitle" x="40" y="72">主机持有权威状态；展示和玩家设备任务都必须经过闸门后，才能回到狼人杀规则模块推进。</text>
+
+  <rect class="node engine" x="40" y="110" width="180" height="74"/>
+  <text class="label" x="130" y="138" text-anchor="middle">开局 / 当前阶段</text>
+  <text class="small" x="130" y="160" text-anchor="middle">map + seats + ready</text>
+
+  <rect class="node engine" x="300" y="110" width="200" height="74"/>
+  <text class="label" x="400" y="138" text-anchor="middle">狼人杀规则模块</text>
+  <text class="small" x="400" y="160" text-anchor="middle">生成行动请求 / 历史事件</text>
+
+  <rect class="node" x="580" y="110" width="205" height="74"/>
+  <text class="label" x="682" y="138" text-anchor="middle">中心发言面板</text>
+  <text class="small" x="682" y="160" text-anchor="middle">一次只展示一条发言 / 行动</text>
+
+  <rect class="node device" x="865" y="110" width="230" height="74"/>
+  <text class="label" x="980" y="138" text-anchor="middle">广播到可见设备</text>
+  <text class="small" x="980" y="160" text-anchor="middle">真人玩家和观战设备都参与确认</text>
+
+  <path class="arrow" d="M 220 147 H 300"/>
+  <path class="arrow" d="M 500 147 H 580"/>
+  <path class="arrow" d="M 785 147 H 865"/>
+
+  <rect class="node gate" x="865" y="230" width="230" height="92"/>
+  <text class="label" x="980" y="258" text-anchor="middle">Presentation ACK Gate</text>
+  <text class="small" x="980" y="280" text-anchor="middle">开启语音：播放完成 ACK</text>
+  <text class="small" x="980" y="300" text-anchor="middle">关闭语音：文本长度 * 0.5 秒</text>
+
+  <path class="arrow" d="M 980 184 V 230"/>
+
+  <rect class="node engine" x="580" y="245" width="205" height="74"/>
+  <text class="label" x="682" y="273" text-anchor="middle">自动推进闸门</text>
+  <text class="small" x="682" y="295" text-anchor="middle">无 ACK / 无设备任务 / 未暂停</text>
+
+  <path class="arrow" d="M 865 276 H 785"/>
+
+  <rect class="node" x="300" y="245" width="200" height="74"/>
+  <text class="label" x="400" y="273" text-anchor="middle">判断当前请求</text>
+  <text class="small" x="400" y="295" text-anchor="middle">发言、夜间行动、投票等</text>
+
+  <path class="arrow" d="M 580 282 H 500"/>
+
+  <rect class="node device" x="40" y="380" width="245" height="96"/>
+  <text class="label" x="162" y="408" text-anchor="middle">真人玩家</text>
+  <text class="small" x="162" y="430" text-anchor="middle">控制设备打开 UI</text>
+  <text class="small" x="162" y="450" text-anchor="middle">对应设备输入后返回结果</text>
+
+  <rect class="node ai" x="300" y="380" width="245" height="96"/>
+  <text class="label" x="422" y="408" text-anchor="middle">AI 机器人玩家</text>
+  <text class="small" x="422" y="430" text-anchor="middle">控制设备读取本机模型配置</text>
+  <text class="small" x="422" y="450" text-anchor="middle">本机调用模型后返回结果</text>
+
+  <rect class="node device" x="580" y="380" width="245" height="96"/>
+  <text class="label" x="702" y="408" text-anchor="middle">Device Task Gate</text>
+  <text class="small" x="702" y="430" text-anchor="middle">主机只路由玩家任务</text>
+  <text class="small" x="702" y="450" text-anchor="middle">接收设备区分真人 / AI</text>
+
+  <path class="arrow" d="M 400 319 V 350 H 162 V 380"/>
+  <path class="arrow" d="M 400 319 V 380"/>
+  <path class="arrow" d="M 285 428 H 300"/>
+  <path class="arrow" d="M 545 428 H 580"/>
+
+  <rect class="node engine" x="865" y="380" width="230" height="96"/>
+  <text class="label" x="980" y="408" text-anchor="middle">统一行动结果</text>
+  <text class="small" x="980" y="430" text-anchor="middle">WerewolfPlayerActionResult</text>
+  <text class="small" x="980" y="450" text-anchor="middle">只回到规则模块校验</text>
+
+  <path class="arrow" d="M 825 428 H 865"/>
+
+  <rect class="node engine" x="865" y="540" width="230" height="90"/>
+  <text class="label" x="980" y="568" text-anchor="middle">规则校验与状态更新</text>
+  <text class="small" x="980" y="590" text-anchor="middle">阶段、死亡、票型、胜负</text>
+  <text class="small" x="980" y="610" text-anchor="middle">生成下一条展示或行动</text>
+
+  <path class="arrow" d="M 980 476 V 540"/>
+
+  <rect class="node" x="580" y="548" width="205" height="74"/>
+  <text class="label" x="682" y="576" text-anchor="middle">是否 completed</text>
+  <text class="small" x="682" y="598" text-anchor="middle">否：回到下一阶段展示</text>
+
+  <path class="arrow" d="M 865 585 H 785"/>
+  <path class="dash" d="M 682 548 V 515 H 400 V 184"/>
+
+  <rect class="node post" x="300" y="535" width="205" height="102"/>
+  <text class="label" x="402" y="563" text-anchor="middle">赛后流程</text>
+  <text class="small" x="402" y="585" text-anchor="middle">赛后发言 / MVP</text>
+  <text class="small" x="402" y="605" text-anchor="middle">打印各身份视角文本数组</text>
+  <text class="small" x="402" y="625" text-anchor="middle">写入记忆模块</text>
+
+  <path class="arrow" d="M 580 585 H 505"/>
+
+  <rect class="node post" x="40" y="548" width="180" height="74"/>
+  <text class="label" x="130" y="576" text-anchor="middle">重新开局前清理</text>
+  <text class="small" x="130" y="598" text-anchor="middle">history / prompt log / session memory</text>
+
+  <path class="arrow" d="M 300 586 H 220"/>
+
+  <rect class="node pause" x="40" y="720" width="320" height="112"/>
+  <text class="label" x="200" y="748" text-anchor="middle">真人设备断线</text>
+  <text class="small" x="200" y="770" text-anchor="middle">非主动离开：保留席位并暂停游戏</text>
+  <text class="small" x="200" y="790" text-anchor="middle">清理 ACK / device task / 模型等待态</text>
+  <text class="small" x="200" y="810" text-anchor="middle">重连且无离线真人后恢复推进</text>
+
+  <rect class="node pause" x="430" y="720" width="300" height="112"/>
+  <text class="label" x="580" y="748" text-anchor="middle">全部真人主动退出</text>
+  <text class="small" x="580" y="770" text-anchor="middle">房间没有真实参与者</text>
+  <text class="small" x="580" y="790" text-anchor="middle">销毁当前游戏房间</text>
+
+  <rect class="node pause" x="800" y="720" width="295" height="112"/>
+  <text class="label" x="948" y="748" text-anchor="middle">模型 / 机器人错误</text>
+  <text class="small" x="948" y="770" text-anchor="middle">不做兜底行动</text>
+  <text class="small" x="948" y="790" text-anchor="middle">中止游戏并弹出错误</text>
+  <text class="small" x="948" y="810" text-anchor="middle">日志打印输入、schema 和原始输出</text>
+
+  <path class="dash" d="M 702 476 V 690 H 200 V 720"/>
+  <path class="dash" d="M 980 630 V 690 H 948 V 720"/>
+  <path class="dash" d="M 130 622 V 682 H 580 V 720"/>
+
+  <text class="tiny" x="40" y="872">注：图中“设备”指真人玩家或观战客户端；AI 玩家不单独计入展示 ACK，需要行动时由控制它的真人设备本机执行。</text>
+</svg>

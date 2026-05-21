@@ -1,6 +1,6 @@
 extends SceneTree
 
-const MapperScript := preload("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_record_formatter.gd")
+const MapperScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_record_formatter.gd")
 
 
 func _initialize() -> void:

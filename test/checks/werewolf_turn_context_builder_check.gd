@@ -1,15 +1,16 @@
 extends SceneTree
 
-const BuilderScript := preload("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_turn_context_builder.gd")
-const RuntimeScript := preload("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_player_runtime.gd")
+const BuilderScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_turn_context_builder.gd")
+const RuntimeScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_player_runtime.gd")
+const PromptPolicyScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_prompt_policy.gd")
 
 
 func _initialize() -> void:
 	var builder = BuilderScript.new()
 	var runtime = RuntimeScript.new()
 	var input := _input()
-	var original_include_memory_hints := AiWerewolfPromptPolicy.include_memory_hints
-	AiWerewolfPromptPolicy.include_memory_hints = true
+	var original_include_memory_hints := PromptPolicyScript.include_memory_hints
+	PromptPolicyScript.include_memory_hints = true
 
 	var wolf_state: Dictionary = builder.visible_state(input, 0, {})
 	var wolf_timeline: Array = wolf_state["timeline"]
@@ -27,16 +28,20 @@ func _initialize() -> void:
 	assert(not payload_text.contains("recentMemoryEntries"))
 	assert(payload.has("targetOptions"))
 	assert((payload["targetOptions"] as Array).size() == 2)
+	assert((payload["targetOptions"] as Array).all(func(value): return value is int))
 	assert(payload.has("current_question"))
-	assert(payload.has("allowedActions"))
+	assert(not payload.has("allowedActions"))
+	assert(not payload.has("facts"))
+	assert(not payload.has("privateInfo"))
 	assert(not payload.has("memoryHints"))
 	assert(not payload.has("outputFormat"))
 	assert(payload.has("current_state"))
 	assert(payload.has("players"))
 	assert(payload.has("timeline"))
-	assert(String(payload.get("current_state", "")) == "第1夜晚上")
+	assert(String(payload.get("current_state", "")).contains("第1夜晚上"))
 	assert((payload["timeline"] as Array).any(func(line): return String(line) == "1号:我倾向今晚先刀3号位。"))
 	assert((runtime.target_options_for_context(action_context) as Array).size() == 2)
+	_check_role_visibility(builder, runtime)
 	var capped_hints: Dictionary = builder.memory_hints({
 		"memoryContextBudgetTokens": 64,
 		"retrievedMemoryEntries": [
@@ -56,6 +61,19 @@ func _initialize() -> void:
 	assert(String(script_context.get("winCondition", "")).contains("所有好人全部出局"))
 	assert(builder.target_from_decision(runtime, "{\"action\":\"wolf_kill\",\"targetSeatNumber\":3}", input, 0, "wolf_kill") == 2)
 	assert(builder.target_from_decision(runtime, "{\"action\":\"wolf_kill\",\"targetSeatNumber\":2}", input, 0, "wolf_kill") == -1)
+	_check_timeline_compression(builder)
+
+	var sheriff_input: Dictionary = input.duplicate(true)
+	(sheriff_input["werewolf"] as Dictionary)["phase"] = "sheriff_speech"
+	(sheriff_input["werewolf"] as Dictionary)["day"] = 1
+	sheriff_input["phase_label"] = "警长竞选发言"
+	((sheriff_input["players"] as Array)[1] as Dictionary)["role"] = "预言家"
+	((sheriff_input["players"] as Array)[1] as Dictionary)["role_key"] = "seer"
+	var seer_campaign_payload: Dictionary = runtime.to_model_payload(builder.speech_context(sheriff_input, 1, {}))
+	var seer_state_text := String(seer_campaign_payload.get("current_state", ""))
+	assert(not seer_campaign_payload.has("facts"))
+	assert(seer_state_text.contains("首夜前"))
+	assert(seer_state_text.contains("没有查验结果"))
 
 	var normalized: Dictionary = builder.normalized_wolf_target_vote(input, 0, {
 		"ok": true,
@@ -63,8 +81,52 @@ func _initialize() -> void:
 		"target_index": 3,
 	})
 	assert(int(normalized.get("target_index", -1)) == 2)
-	AiWerewolfPromptPolicy.include_memory_hints = original_include_memory_hints
+	PromptPolicyScript.include_memory_hints = original_include_memory_hints
 	quit()
+
+
+func _check_role_visibility(builder, runtime) -> void:
+	var input := _input()
+	((input["players"] as Array)[1] as Dictionary)["alive"] = false
+	var villager_payload: Dictionary = runtime.to_model_payload(builder.speech_context(input, 2, {}))
+	var players: Array = villager_payload["players"]
+	assert(String((players[1] as Dictionary).get("role", "")) == "未知")
+
+	(input["werewolf"] as Dictionary)["phase"] = "post_game_summary"
+	var post_game_payload: Dictionary = runtime.to_model_payload(builder.speech_context(input, 2, {}))
+	var post_game_players: Array = post_game_payload["players"]
+	assert(String((post_game_players[1] as Dictionary).get("role", "")) == "狼人")
+
+	var reveal_input := _input()
+	var idiot: Dictionary = (reveal_input["players"] as Array)[3]
+	idiot["role"] = "白痴"
+	idiot["role_key"] = "idiot"
+	idiot["idiot_revealed"] = true
+	(reveal_input["players"] as Array)[3] = idiot
+	var reveal_payload: Dictionary = runtime.to_model_payload(builder.speech_context(reveal_input, 2, {}))
+	var reveal_players: Array = reveal_payload["players"]
+	assert(String((reveal_players[3] as Dictionary).get("role", "")) == "白痴")
+
+
+func _check_timeline_compression(builder) -> void:
+	var input := _input()
+	input["timeline_compression"] = {
+		"enabled": true,
+		"model": "glm-5.1",
+		"interval": 2,
+		"prompt": "把以下时间线转化为事实，减短内容。",
+	}
+	var history: Array = input["history"]
+	history.clear()
+	for i in range(6):
+		history.append({"speaker": "%d号 玩家%d" % [i + 1, i + 1], "speaker_index": i % 4, "text": "第%d条发言内容，保留事实。" % [i + 1], "at": float(i + 1)})
+	input["wolf_private_history"] = []
+	var state: Dictionary = builder.visible_state(input, 0, {"contextBudgetTokens": 4096})
+	var timeline: Array = state["timeline"]
+	assert(timeline.size() < 6)
+	assert(String((timeline[0] as Dictionary).get("type", "")) == "timeline_summary")
+	assert(String((timeline[0] as Dictionary).get("description", "")).contains("事实摘要"))
+	assert(int(state.get("timelineCompressedCount", 0)) > 0)
 
 
 func _input() -> Dictionary:

@@ -1,10 +1,14 @@
 extends SceneTree
 
+const PromptPolicyScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_prompt_policy.gd")
+
 
 func _initialize() -> void:
-	var memory_context = load("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_memory_context.gd").new()
+	var original_include_memory_hints := PromptPolicyScript.include_memory_hints
+	PromptPolicyScript.include_memory_hints = true
+	var memory_context = load("res://scripts/player/werewolf/ai/ai_werewolf_memory_context.gd").new()
 	var manager = load("res://scripts/core/memory/memory_manager.gd").new()
-	var builder = load("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_memory.gd").new()
+	var builder = load("res://scripts/player/werewolf/ai/ai_werewolf_memory.gd").new()
 	manager.persistence_enabled = false
 	manager.load_or_create()
 
@@ -54,4 +58,5 @@ func _initialize() -> void:
 	assert(int(limits.get("sessionEntryLimit", 0)) == 3)
 	assert(int(limits.get("mergedRetrievalLimit", 0)) == 3)
 	assert(int(limits.get("queryCharLimit", 0)) == 600)
+	PromptPolicyScript.include_memory_hints = original_include_memory_hints
 	quit()

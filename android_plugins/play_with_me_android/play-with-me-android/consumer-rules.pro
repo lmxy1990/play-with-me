@@ -1,0 +1,1 @@
+-keep class com.playwithme.godot.PlayWithMeAndroid { *; }

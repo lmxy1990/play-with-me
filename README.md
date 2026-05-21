@@ -32,7 +32,7 @@ Play With Me 是一个 Godot 4.6 横屏移动端桌游应用。当前核心玩�
 - [文档总入口](docs/README.md)：推荐阅读顺序和文档归档规则。
 - [工程目录结构](docs/project-structure/README.md)：Godot 工程、Android 插件、构建脚本、测试和生成物目录。
 - [整体架构](docs/architecture.md)：系统分层、技术栈、运行时结构和模块边界。
-- [程序模块结构](docs/modules/README.md)：按业务模块组织逻辑边界；房间是通用运行容器，具体游戏以游戏房间模块接入，狼人杀房间模块和狼人杀玩家适配归在 `room/werewolf` 下。
+- [程序模块结构](docs/modules/README.md)：按业务模块组织逻辑边界；房间是通用运行容器，具体游戏以游戏房间模块接入，玩家模块由父级玩家、真人玩家、AI 玩家、狼人杀真人玩家和狼人杀 AI 玩家共同组成。
 - [跨模块契约](docs/contracts/README.md)：模块之间的数据对象、可见性、调用结果和变更规则。
 - [构建部署](docs/build_deployment.md)：Android 插件、APK 导出和设备安装。
 - [维护指南](docs/maintenance.md)：常见改动位置和维护约定。
@@ -60,10 +60,10 @@ scenes/                         页面场景
 scripts/core/                   路由、状态、配置、模型、记忆、TTS、机器人
 scripts/network/                局域网发现、网络信封、扫码 payload
 scripts/pages/                  大厅、配置页、复盘页
-scripts/room/                   房间通用运行时和玩家基础数据
+scripts/player/                 玩家模块：父级玩家、真人玩家、AI 玩家和具体游戏玩家实现
+scripts/room/                   房间通用运行时
 scripts/room/network/           WebSocket 会话、快照、重连副本、参与者注册、房主接管
 scripts/room/werewolf/          狼人杀房间模块和当前房间页面
-scripts/room/werewolf/player/   狼人杀真人/AI 机器人玩家适配目标目录
 scripts/android/                Godot 到 Android 插件的桥接
 scripts/ui/                     通用 UI、二维码生成、扫码处理 UI
 android_plugins/play_with_me_android/ Android 原生插件源码
@@ -93,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File tools\install_android_apk.ps1 -Apk buil
 基础模块：
 
 - 偏好设置模块：本机偏好黑盒，负责偏好 JSON、昵称、头像、播放声音配置引用和设备私钥只读能力。
-- 玩家模块：通用玩家运行黑盒，负责玩家基础资料、运行时绑定、玩家级可信通道、玩家临时数据、断联恢复、玩家控制器入口和公共 TTS 文本转语音接口。
+- 玩家模块：通用玩家运行黑盒，由父级玩家模块、真人玩家模块、AI 玩家模块、狼人杀真人玩家模块、狼人杀 AI 玩家模块共同组成，负责玩家基础资料、运行时绑定、玩家级可信通道、玩家临时数据、断联恢复、玩家控制器入口和公共 TTS 文本转语音接口。
 - 模型管理模块：模型 I/O 黑盒，负责模型配置、供应商列表、配置测试和一次模型输入输出调用。
 - 机器人/RAG 模块：通用机器人能力黑盒，内部拆分记忆模块和机器人上下文处理模块，对外提供机器人创建、上下文构建和分层记忆更新能力。
 - TTS 语音模块：语音输出黑盒，负责声音配置、文本转语音、播放队列和播放事件。
@@ -102,7 +102,6 @@ powershell -ExecutionPolicy Bypass -File tools\install_android_apk.ps1 -Apk buil
 
 - 大厅模块：入口编排黑盒，聚合房间摘要、发现、重连和配置入口。
 - 创建房间模块：统一创建 UI 编排，读取可创建游戏房间模块、地图、支持人数和场景槽位，并提交房间创建请求。
-- 狼人杀玩家适配层：游戏房间行动请求到玩家响应的适配黑盒，真人按指令类型打开 UI 并经玩家通道回传输入，AI 机器人读取机器人档案并调用模型生成响应，统一真人和 AI 机器人行动结果。
 
 大编织模块：
 

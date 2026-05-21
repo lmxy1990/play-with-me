@@ -1,8 +1,8 @@
 extends SceneTree
 
-const BuilderScript := preload("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_turn_context_builder.gd")
-const MemoryScript := preload("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_memory.gd")
-const MemoryContextScript := preload("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_memory_context.gd")
+const BuilderScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_turn_context_builder.gd")
+const MemoryScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_memory.gd")
+const MemoryContextScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_memory_context.gd")
 
 
 func _initialize() -> void:

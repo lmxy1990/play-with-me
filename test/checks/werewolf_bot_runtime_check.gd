@@ -1,5 +1,7 @@
 extends SceneTree
 
+const PromptPolicyScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_prompt_policy.gd")
+
 
 func _initialize() -> void:
 	var state = load("res://scripts/core/app_state.gd").new()
@@ -12,6 +14,7 @@ func _initialize() -> void:
 
 	_seed_players(page)
 	_check_device_task_frame_does_not_clear_hidden_roles(page)
+	_check_bot_model_output_token_budget(page)
 	_check_payload_is_sanitized(page)
 	_check_long_speech_outputs_are_accepted(page)
 	_check_guard_target_options(page)
@@ -56,8 +59,8 @@ func _seed_players(page) -> void:
 
 
 func _check_payload_is_sanitized(page) -> void:
-	var original_include_memory_hints := AiWerewolfPromptPolicy.include_memory_hints
-	AiWerewolfPromptPolicy.include_memory_hints = true
+	var original_include_memory_hints := PromptPolicyScript.include_memory_hints
+	PromptPolicyScript.include_memory_hints = true
 	var context: Dictionary = page._bot_action_context(0, "vote", {
 		"retrievedMemoryEntries": [
 			{"content": "player_2 上局悍跳后被票型抓住。", "source": "long_term", "score": 0.8},
@@ -69,15 +72,17 @@ func _check_payload_is_sanitized(page) -> void:
 	assert(not encoded.contains("player_2"))
 	assert(encoded.contains("2号位"))
 	assert(payload.has("current_question"))
-	assert(payload.has("allowedActions"))
+	assert(not payload.has("allowedActions"))
 	assert(payload.has("memoryHints"))
 	assert(not payload.has("outputFormat"))
+	assert(not payload.has("facts"))
+	assert(not payload.has("privateInfo"))
 	assert(payload.has("current_state"))
 	assert(payload.has("players"))
 	assert(payload.has("timeline"))
 	assert(not payload.has("visibleState"))
 	assert(payload.has("targetOptions"))
-	assert(String(payload.get("current_state", "")) == "第2天白天")
+	assert(String(payload.get("current_state", "")).contains("第2天白天"))
 	var timeline: Array = payload["timeline"]
 	assert(String(timeline[0]).begins_with("主持人:"))
 	assert(String(timeline[1]) == "1号:我先听2号位。")
@@ -88,31 +93,37 @@ func _check_payload_is_sanitized(page) -> void:
 	var players: Array = payload["players"]
 	assert(String((players[0] as Dictionary).get("role", "")) == "守卫")
 	assert(String((players[1] as Dictionary).get("role", "")) == "未知")
-	assert(String((players[2] as Dictionary).get("role", "")) == "村民")
+	assert(String((players[2] as Dictionary).get("role", "")) == "未知")
 	var targets: Array = page._bot_runtime.target_options_for_context(context)
 	assert(targets.size() == 1)
 	assert(int((targets[0] as Dictionary).get("targetSeatNumber", -1)) == 2)
 	assert((payload["targetOptions"] as Array).size() == targets.size())
+	assert((payload["targetOptions"] as Array).has(2))
+	assert((payload["targetOptions"] as Array).all(func(value): return value is int))
 	var messages: Array = page._bot_runtime.build_messages(context)
 	var system_content := String((messages[0] as Dictionary).get("content", ""))
-	assert(system_content.contains("[游戏规则]"))
-	assert(system_content.contains("[当前状态]"))
-	assert(system_content.contains("[游戏上下文]"))
-	assert(system_content.contains("[原则]"))
+	assert(system_content.contains("游戏规则："))
+	assert(system_content.contains("当前状态："))
 	assert(system_content.contains("targetOptions"))
 	assert(system_content.contains("players"))
-	assert(system_content.contains("[输出格式]"))
-	assert(system_content.contains("只返回一个 JSON 对象"))
-	assert(system_content.contains("JSON 只能包含 action 和 targetSeatNumber 两个字段"))
+	assert(system_content.contains("只返回 {\"action\":\"vote\",\"targetSeatNumber\":数字}"))
+	assert(system_content.contains("action 表示本次行动：白天放逐投票"))
+	assert(system_content.contains("固定填 vote"))
+	assert(not system_content.contains("[游戏上下文]"))
+	assert(not system_content.contains("[原则]"))
+	assert(not system_content.contains("allowedActions"))
+	assert(not system_content.contains("建议回复在120字以内"))
 	assert(not system_content.contains("建议发言控制在120字以内"))
 	assert(not system_content.contains("只输出 JSON"))
 	assert(not system_content.contains("confidence"))
 	assert(not system_content.contains("只包含 current_question"))
 	assert(not system_content.contains("你觉得prompt"))
 	var user_content := String((messages[1] as Dictionary).get("content", ""))
-	assert(user_content == String(payload.get("current_question", "")))
-	assert(not user_content.begins_with("{"))
+	assert(user_content.begins_with("{"))
 	assert(not user_content.contains("player_2"))
+	var parsed_user = JSON.parse_string(user_content)
+	assert(parsed_user is Dictionary)
+	assert(String((parsed_user as Dictionary).get("current_question", "")) == String(payload.get("current_question", "")))
 	var response_schema: Dictionary = page._bot_runtime.response_schema_for_context(context)
 	assert(not response_schema.is_empty())
 	assert(String(response_schema.get("name", "")) == "werewolf_vote_v1")
@@ -121,7 +132,10 @@ func _check_payload_is_sanitized(page) -> void:
 	assert(not JSON.stringify(schema_body).contains("confidence"))
 	assert((schema_body["required"] as Array).has("targetSeatNumber"))
 	var properties: Dictionary = schema_body["properties"] as Dictionary
+	assert(((properties["action"] as Dictionary).get("enum", []) as Array) == ["vote"])
+	assert(String((properties["action"] as Dictionary).get("description", "")) == "本次行动：白天放逐投票。固定值。")
 	var target_schema: Dictionary = properties["targetSeatNumber"] as Dictionary
+	assert(String(target_schema.get("description", "")) == "放逐投票目标座位号。")
 	assert((target_schema["enum"] as Array).size() == 1)
 	assert(int((target_schema["enum"] as Array)[0]) == 2)
 	var speech_schema: Dictionary = page._bot_runtime.response_schema_for_context({"allowed_actions": ["speak"]})
@@ -136,7 +150,7 @@ func _check_payload_is_sanitized(page) -> void:
 	assert(not wolf_chat_request_options.has("response_schema"))
 	_check_kimi_robot_model_request_payload(page, context, messages, response_schema)
 	_check_glm_robot_model_request_payload(page, context, messages, response_schema)
-	AiWerewolfPromptPolicy.include_memory_hints = original_include_memory_hints
+	PromptPolicyScript.include_memory_hints = original_include_memory_hints
 
 
 func _check_device_task_frame_does_not_clear_hidden_roles(page) -> void:
@@ -177,6 +191,53 @@ func _check_device_task_frame_does_not_clear_hidden_roles(page) -> void:
 	assert(String(page._players[2].get("role_key", "")) == "villager")
 
 
+func _check_bot_model_output_token_budget(page) -> void:
+	var client = load("res://scripts/core/model/model_chat_client.gd").new()
+	assert(int(page._bot_max_output_tokens_for_task_kind("action")) == 2000)
+	assert(int(page._bot_max_output_tokens_for_task_kind("speech")) == 2000)
+	assert(int(page._bot_max_output_tokens_for_task_kind("wolf_chat")) == 2000)
+	page._rooms = [{"id": "room_token_check", "bot_max_output_tokens": 12345}]
+	page._app_state.active_room_id = "room_token_check"
+	assert(int(page._bot_max_output_tokens_for_task_kind("action")) == 12345)
+	page._rooms.clear()
+	page._app_state.active_room_id = ""
+
+	var messages := [{"role": "user", "content": "hello"}]
+	var request_options := {
+		"output_type": "text",
+		"output_adapter": "none",
+		"reasoning_mode": "off",
+	}
+	var profile := {
+		"provider": "openai_api",
+		"endpoint": "https://example.com/v1",
+		"model": "test-model",
+		"api_key": "sk-test",
+		"formt_adapter": "none",
+		"reasoning": false,
+		"max_output": 4096,
+	}
+	var request: Dictionary = page._model_completion_request(profile, messages, 0.45, page._bot_max_output_tokens_for_task_kind("action"), 30.0, request_options, "werewolf.action.vote")
+	assert(int(request.get("max_output_tokens", 0)) == 2000)
+	var debug: Dictionary = client.build_request_debug_payload(request)
+	var payload: Dictionary = debug["payload"] as Dictionary
+	assert(int(debug.get("output_tokens", 0)) == 2000)
+	assert(int(payload.get("max_tokens", 0)) == 2000)
+
+	var reasoning_profile: Dictionary = profile.duplicate(true)
+	reasoning_profile["reasoning"] = true
+	reasoning_profile["reason_adapter"] = "glm_thinking"
+	var reasoning_options: Dictionary = request_options.duplicate(true)
+	reasoning_options["reasoning_mode"] = "on"
+	var reasoning_request: Dictionary = page._model_completion_request(reasoning_profile, messages, 0.45, page._bot_max_output_tokens_for_task_kind("action"), 30.0, reasoning_options, "werewolf.action.vote")
+	assert(int(reasoning_request.get("max_output_tokens", -1)) == 0)
+	assert(int(reasoning_request.get("max_output", -1)) == 0)
+	var reasoning_debug: Dictionary = client.build_request_debug_payload(reasoning_request)
+	var reasoning_payload: Dictionary = reasoning_debug["payload"] as Dictionary
+	assert(int(reasoning_debug.get("output_tokens", -1)) == 0)
+	assert(not reasoning_payload.has("max_tokens"))
+
+
 func _check_kimi_robot_model_request_payload(page, context: Dictionary, action_messages: Array, response_schema: Dictionary) -> void:
 	var client = load("res://scripts/core/model/model_chat_client.gd").new()
 	var request_options: Dictionary = page._bot_runtime.request_options_for_context(context)
@@ -190,7 +251,7 @@ func _check_kimi_robot_model_request_payload(page, context: Dictionary, action_m
 		"reasoning": true,
 		"max_output": 4096,
 	}
-	var action_request: Dictionary = page._model_completion_request(profile, action_messages, 0.45, 0, 30.0, request_options, "werewolf.action.vote")
+	var action_request: Dictionary = page._model_completion_request(profile, action_messages, 0.45, page._bot_max_output_tokens_for_task_kind("action"), 30.0, request_options, "werewolf.action.vote")
 	var action_debug: Dictionary = client.build_request_debug_payload(action_request)
 	var action_payload: Dictionary = action_debug["payload"] as Dictionary
 	assert(String(action_debug.get("output_type", "")) == "json")
@@ -207,21 +268,22 @@ func _check_kimi_robot_model_request_payload(page, context: Dictionary, action_m
 	var speech_context: Dictionary = page._bot_speech_context(0, {})
 	var speech_messages: Array = page._bot_runtime.build_messages(speech_context)
 	var speech_system := String((speech_messages[0] as Dictionary).get("content", ""))
-	assert(speech_system.contains("直接输出发言文本"))
+	assert(speech_system.contains("直接返回发言文本"))
+	assert(speech_system.contains("建议回复在120字以内"))
 	var speech_request_options: Dictionary = page._bot_runtime.request_options_for_context(speech_context)
 	assert(String(speech_request_options.get("output_type", "")) == "text")
 	assert(String(speech_request_options.get("output_adapter", "")) == "none")
 	var speech_profile: Dictionary = profile.duplicate(true)
 	speech_profile["formt_adapter"] = "none"
 	speech_profile["reasoning"] = false
-	var speech_request: Dictionary = page._model_completion_request(speech_profile, speech_messages, 0.72, 0, 30.0, speech_request_options, "werewolf.speech")
+	var speech_request: Dictionary = page._model_completion_request(speech_profile, speech_messages, 0.72, page._bot_max_output_tokens_for_task_kind("speech"), 30.0, speech_request_options, "werewolf.speech")
 	var speech_debug: Dictionary = client.build_request_debug_payload(speech_request)
 	var speech_payload: Dictionary = speech_debug["payload"] as Dictionary
 	assert(String(speech_debug.get("output_type", "")) == "text")
 	assert(String(speech_debug.get("output_adapter", "")) == "none")
 	assert(String(speech_debug.get("payload_schema", "")) == "empty")
-	assert(int(speech_debug.get("output_tokens", 0)) == 4096)
-	assert(int(speech_payload.get("max_tokens", 0)) == 4096)
+	assert(int(speech_debug.get("output_tokens", 0)) == 2000)
+	assert(int(speech_payload.get("max_tokens", 0)) == 2000)
 	assert(not speech_payload.has("response_format"))
 	assert(not speech_payload.has("reasoning_effort"))
 	assert(String((speech_payload.get("thinking", {}) as Dictionary).get("type", "")) == "disabled")
@@ -240,7 +302,7 @@ func _check_glm_robot_model_request_payload(page, context: Dictionary, action_me
 		"reasoning": true,
 		"max_output": 4096,
 	}
-	var action_request: Dictionary = page._model_completion_request(profile, action_messages, 0.45, 0, 30.0, request_options, "werewolf.action.vote")
+	var action_request: Dictionary = page._model_completion_request(profile, action_messages, 0.45, page._bot_max_output_tokens_for_task_kind("action"), 30.0, request_options, "werewolf.action.vote")
 	var action_debug: Dictionary = client.build_request_debug_payload(action_request)
 	var action_payload: Dictionary = action_debug["payload"] as Dictionary
 	assert(String(action_debug.get("output_type", "")) == "json")
@@ -280,11 +342,13 @@ func _check_guard_target_options(page) -> void:
 	var payload: Dictionary = page._bot_runtime.to_model_payload(context)
 	assert(payload.has("targetOptions"))
 	assert(String(payload.get("current_question", "")) == "选择今晚守护目标。")
-	assert(String(JSON.stringify(payload.get("privateInfo", {}))).contains("lastGuardedPlayer"))
+	assert(not payload.has("privateInfo"))
+	assert(String(payload.get("current_state", "")).contains("上次守护"))
 	var targets: Array = page._bot_runtime.target_options_for_context(context)
 	assert(targets.size() == 1)
 	assert(int((targets[0] as Dictionary).get("targetSeatNumber", -1)) == 1)
 	assert((payload["targetOptions"] as Array).size() == targets.size())
+	assert((payload["targetOptions"] as Array).has(1))
 	var decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"guard_protect\",\"targetSeatNumber\":1}", context)
 	assert(bool(decision.get("ok", false)))
 	assert(String(decision.get("action", "")) == "guard_protect")
@@ -318,6 +382,8 @@ func _check_sheriff_vote_self_target(page) -> void:
 	assert(int((targets[0] as Dictionary).get("targetSeatNumber", -1)) == 1)
 	assert(int((targets[1] as Dictionary).get("targetSeatNumber", -1)) == 2)
 	assert((payload["targetOptions"] as Array).size() == targets.size())
+	assert((payload["targetOptions"] as Array).has(1))
+	assert((payload["targetOptions"] as Array).has(2))
 	var response_schema: Dictionary = page._bot_runtime.response_schema_for_context(context)
 	assert(not response_schema.is_empty())
 	assert(bool(response_schema.get("strict", false)))
@@ -338,31 +404,37 @@ func _check_sheriff_speech_order_context(page) -> void:
 	page._werewolf["sheriff_player_index"] = 0
 	page._werewolf["current_action"] = {"key": "sheriff_speech_order", "actor_index": 0, "label": "发言顺序"}
 	var context: Dictionary = page._bot_action_context(0, "sheriff_speech_order", {})
-	assert((context["allowed_actions"] as Array).has("sheriff_speech_order_clockwise"))
-	assert((context["allowed_actions"] as Array).has("sheriff_speech_order_counterclockwise"))
+	assert((context["allowed_actions"] as Array) == ["sheriff_speech_order"])
 	var payload: Dictionary = page._bot_runtime.to_model_payload(context)
 	assert(payload.has("targetOptions"))
 	assert(String(payload.get("current_question", "")) == "指定白天发言起点和方向。")
 	var messages: Array = page._bot_runtime.build_messages(context)
 	var system_content := String((messages[0] as Dictionary).get("content", ""))
-	assert(system_content.contains("[行动含义]"))
-	assert(system_content.contains("sheriff_speech_order_clockwise"))
-	assert(system_content.contains("sheriff_speech_order_counterclockwise"))
+	assert(not system_content.contains("[行动含义]"))
+	assert(system_content.contains("action 表示本次行动：警长指定白天发言起点和方向"))
+	assert(system_content.contains("固定填 sheriff_speech_order"))
+	assert(system_content.contains("direction 选 clockwise 顺时针或 counterclockwise 逆时针"))
+	assert(not system_content.contains("sheriff_speech_order_clockwise"))
+	assert(not system_content.contains("sheriff_speech_order_counterclockwise"))
 	var targets: Array = page._bot_runtime.target_options_for_context(context)
 	assert(targets.size() == 2)
 	assert(int((targets[0] as Dictionary).get("targetSeatNumber", -1)) == 1)
 	assert(int((targets[1] as Dictionary).get("targetSeatNumber", -1)) == 2)
-	assert(((targets[0] as Dictionary).get("targetActions", []) as Array).has("sheriff_speech_order_clockwise"))
-	assert(((targets[0] as Dictionary).get("targetActions", []) as Array).has("sheriff_speech_order_counterclockwise"))
+	assert((payload["targetOptions"] as Array).has(1))
+	assert((payload["targetOptions"] as Array).has(2))
+	assert(((targets[0] as Dictionary).get("targetActions", []) as Array).has("sheriff_speech_order"))
 	var response_schema: Dictionary = page._bot_runtime.response_schema_for_context(context)
 	assert(not response_schema.is_empty())
 	var schema_body: Dictionary = response_schema["schema"] as Dictionary
 	var properties: Dictionary = schema_body["properties"] as Dictionary
-	assert(((properties["action"] as Dictionary).get("enum", []) as Array).has("sheriff_speech_order_clockwise"))
-	assert(((properties["action"] as Dictionary).get("enum", []) as Array).has("sheriff_speech_order_counterclockwise"))
+	assert(((properties["action"] as Dictionary).get("enum", []) as Array) == ["sheriff_speech_order"])
+	assert(String((properties["action"] as Dictionary).get("description", "")) == "本次行动：警长指定白天发言起点和方向。固定值。")
+	assert(String((properties["targetSeatNumber"] as Dictionary).get("description", "")) == "发言起点座位号。")
 	assert(((properties["targetSeatNumber"] as Dictionary).get("enum", []) as Array).has(1))
 	assert(((properties["targetSeatNumber"] as Dictionary).get("enum", []) as Array).has(2))
-	var parsed: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"sheriff_speech_order_counterclockwise\",\"targetSeatNumber\":2}", context)
+	assert(((properties["direction"] as Dictionary).get("enum", []) as Array).has("clockwise"))
+	assert(((properties["direction"] as Dictionary).get("enum", []) as Array).has("counterclockwise"))
+	var parsed: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"sheriff_speech_order\",\"targetSeatNumber\":2,\"direction\":\"counterclockwise\"}", context)
 	assert(bool(parsed.get("ok", false)))
 	assert(String(parsed.get("action", "")) == "sheriff_speech_order_counterclockwise")
 	assert(int(parsed.get("target_index", -1)) == 1)
@@ -380,43 +452,45 @@ func _check_sheriff_badge_context(page) -> void:
 	page._werewolf["sheriff_badge_dead_index"] = 0
 	page._werewolf["current_action"] = {"key": "sheriff_badge_action", "actor_index": 0, "label": "警徽"}
 	var context: Dictionary = page._bot_action_context(0, "sheriff_badge_action", {})
-	assert((context["allowed_actions"] as Array).has("sheriff_badge_pass"))
-	assert((context["allowed_actions"] as Array).has("sheriff_badge_destroy"))
+	assert((context["allowed_actions"] as Array) == ["sheriff_badge_action"])
 	var payload: Dictionary = page._bot_runtime.to_model_payload(context)
 	assert(String(payload.get("current_question", "")).contains("飞警徽"))
 	assert(String(payload.get("current_question", "")).contains("撕警徽"))
 	assert(payload.has("targetOptions"))
 	var messages: Array = page._bot_runtime.build_messages(context)
 	var system_content := String((messages[0] as Dictionary).get("content", ""))
-	assert(system_content.contains("[行动含义]"))
-	assert(system_content.contains("sheriff_badge_pass"))
-	assert(system_content.contains("sheriff_badge_destroy"))
+	assert(not system_content.contains("[行动含义]"))
+	assert(system_content.contains("action 表示本次行动：警长死亡后处理警徽"))
+	assert(system_content.contains("固定填 sheriff_badge_action"))
+	assert(system_content.contains("-1 表示撕警徽"))
+	assert(system_content.contains("其他座位表示飞警徽给该玩家"))
+	assert(not system_content.contains("sheriff_badge_pass"))
+	assert(not system_content.contains("sheriff_badge_destroy"))
 	var targets: Array = page._bot_runtime.target_options_for_context(context)
 	assert(targets.size() == 1)
 	assert(int((targets[0] as Dictionary).get("targetSeatNumber", -1)) == 2)
-	assert(((targets[0] as Dictionary).get("targetActions", []) as Array).has("sheriff_badge_pass"))
+	assert(((targets[0] as Dictionary).get("targetActions", []) as Array).has("sheriff_badge_action"))
+	assert((payload["targetOptions"] as Array).has(-1))
+	assert((payload["targetOptions"] as Array).has(2))
 	var response_schema: Dictionary = page._bot_runtime.response_schema_for_context(context)
 	assert(not response_schema.is_empty())
 	var schema_body: Dictionary = response_schema["schema"] as Dictionary
 	var properties: Dictionary = schema_body["properties"] as Dictionary
-	assert(((properties["action"] as Dictionary).get("enum", []) as Array).has("sheriff_badge_pass"))
-	assert(((properties["action"] as Dictionary).get("enum", []) as Array).has("sheriff_badge_destroy"))
+	assert(((properties["action"] as Dictionary).get("enum", []) as Array) == ["sheriff_badge_action"])
+	assert(String((properties["action"] as Dictionary).get("description", "")) == "本次行动：警长死亡后处理警徽。固定值。")
+	assert(String((properties["targetSeatNumber"] as Dictionary).get("description", "")) == "目标座位号。-1 表示撕警徽。")
 	var target_enum: Array = (properties["targetSeatNumber"] as Dictionary).get("enum", []) as Array
 	assert(target_enum.has(-1))
 	assert(target_enum.has(2))
-	var variants: Array = schema_body.get("anyOf", []) as Array
-	assert(_schema_variant_has_action_target(variants, "sheriff_badge_pass", 2))
-	assert(_schema_variant_has_action_target(variants, "sheriff_badge_destroy", -1))
-	var pass_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"sheriff_badge_pass\",\"targetSeatNumber\":2}", context)
+	assert(not schema_body.has("anyOf"))
+	var pass_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"sheriff_badge_action\",\"targetSeatNumber\":2}", context)
 	assert(bool(pass_decision.get("ok", false)))
+	assert(String(pass_decision.get("action", "")) == "sheriff_badge_pass")
 	assert(int(pass_decision.get("target_index", -1)) == 1)
-	var destroy_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"sheriff_badge_destroy\",\"targetSeatNumber\":-1}", context)
+	var destroy_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"sheriff_badge_action\",\"targetSeatNumber\":-1}", context)
 	assert(bool(destroy_decision.get("ok", false)))
+	assert(String(destroy_decision.get("action", "")) == "sheriff_badge_destroy")
 	assert(int(destroy_decision.get("target_index", -1)) == -1)
-	var destroy_with_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"sheriff_badge_destroy\",\"targetSeatNumber\":2}", context)
-	assert(not bool(destroy_with_target.get("ok", false)))
-	var pass_no_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"sheriff_badge_pass\",\"targetSeatNumber\":-1}", context)
-	assert(not bool(pass_no_target.get("ok", false)))
 	page._players[0]["alive"] = true
 
 
@@ -456,17 +530,19 @@ func _check_witch_skip_and_save(page) -> void:
 	page._werewolf["night"] = {"wolf_target_index": 1}
 	page._werewolf["current_action"] = {"key": "witch_act", "actor_index": 0, "label": "用药"}
 	var context: Dictionary = page._bot_action_context(0, "witch_act", {})
-	assert((context["allowed_actions"] as Array).has("witch_save"))
-	assert((context["allowed_actions"] as Array).has("witch_skip"))
+	assert((context["allowed_actions"] as Array) == ["witch_act"])
 	var payload: Dictionary = page._bot_runtime.to_model_payload(context)
 	assert(String(payload.get("current_question", "")) == "选择救人、毒人或跳过。")
-	assert(String(JSON.stringify(payload.get("privateInfo", {}))).contains("tonightKilledPlayer"))
+	assert(not payload.has("privateInfo"))
+	assert(String(payload.get("current_state", "")).contains("今晚被袭击"))
+	assert(String(payload.get("current_state", "")).contains("解药：可用"))
 	assert(payload.has("targetOptions"))
 	var targets: Array = page._bot_runtime.target_options_for_context(context)
 	assert(targets.size() == 1)
 	assert(int((targets[0] as Dictionary).get("targetSeatNumber", -1)) == 2)
 	assert(((targets[0] as Dictionary).get("targetActions", []) as Array).has("witch_save"))
-	assert((payload["targetOptions"] as Array).size() == targets.size())
+	assert((payload["targetOptions"] as Array).has(-1))
+	assert((payload["targetOptions"] as Array).has(2))
 	var response_schema: Dictionary = page._bot_runtime.response_schema_for_context(context)
 	assert(not response_schema.is_empty())
 	assert(bool(response_schema.get("strict", false)))
@@ -477,25 +553,22 @@ func _check_witch_skip_and_save(page) -> void:
 	assert((schema_body["properties"] as Dictionary).has("targetSeatNumber"))
 	var properties: Dictionary = schema_body["properties"] as Dictionary
 	var target_schema: Dictionary = properties["targetSeatNumber"] as Dictionary
+	assert(((properties["action"] as Dictionary).get("enum", []) as Array) == ["witch_act"])
+	assert(String((properties["action"] as Dictionary).get("description", "")) == "本次行动：女巫用药。固定值。")
+	assert(String(target_schema.get("description", "")) == "目标座位号。-1 表示不用药。")
 	assert((target_schema.get("enum", []) as Array).has(-1))
 	assert((target_schema.get("enum", []) as Array).has(2))
-	var variants: Array = schema_body.get("anyOf", []) as Array
-	assert(_schema_variant_has_action_target(variants, "witch_save", 2))
-	assert(_schema_variant_has_action_target(variants, "witch_skip", -1))
-	var save_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_save\",\"targetSeatNumber\":2}", context)
+	assert(not schema_body.has("anyOf"))
+	var save_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_act\",\"targetSeatNumber\":2}", context)
 	assert(bool(save_decision.get("ok", false)))
+	assert(String(save_decision.get("action", "")) == "witch_save")
 	assert(int(save_decision.get("target_index", -1)) == 1)
-	var save_missing_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_save\"}", context)
+	var save_missing_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_act\"}", context)
 	assert(not bool(save_missing_target.get("ok", false)))
-	var save_with_no_target_marker: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_save\",\"targetSeatNumber\":-1}", context)
-	assert(not bool(save_with_no_target_marker.get("ok", false)))
-	var skip_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_skip\",\"targetSeatNumber\":-1}", context)
+	var skip_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_act\",\"targetSeatNumber\":-1}", context)
 	assert(bool(skip_decision.get("ok", false)))
+	assert(String(skip_decision.get("action", "")) == "witch_skip")
 	assert(int(skip_decision.get("target_index", -1)) == -1)
-	var skip_missing_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_skip\"}", context)
-	assert(not bool(skip_missing_target.get("ok", false)))
-	var skip_with_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_skip\",\"targetSeatNumber\":2}", context)
-	assert(not bool(skip_with_target.get("ok", false)))
 
 
 func _check_witch_poison_targets_exclude_save_target(page) -> void:
@@ -511,13 +584,17 @@ func _check_witch_poison_targets_exclude_save_target(page) -> void:
 	var context: Dictionary = page._bot_action_context(0, "witch_act", {})
 	var payload: Dictionary = page._bot_runtime.to_model_payload(context)
 	assert(payload.has("targetOptions"))
+	assert(String(payload.get("current_state", "")).contains("今晚被袭击"))
+	assert(String(payload.get("current_state", "")).contains("毒药：可用"))
 	var targets: Array = page._bot_runtime.target_options_for_context(context)
 	assert(targets.size() == 2)
 	assert(int((targets[0] as Dictionary).get("targetSeatNumber", -1)) == 2)
 	assert(((targets[0] as Dictionary).get("targetActions", []) as Array).has("witch_save"))
 	assert(int((targets[1] as Dictionary).get("targetSeatNumber", -1)) == 3)
 	assert(((targets[1] as Dictionary).get("targetActions", []) as Array).has("witch_poison"))
-	assert((payload["targetOptions"] as Array).size() == targets.size())
+	assert((payload["targetOptions"] as Array).has(-1))
+	assert((payload["targetOptions"] as Array).has(2))
+	assert((payload["targetOptions"] as Array).has(3))
 	var response_schema: Dictionary = page._bot_runtime.response_schema_for_context(context)
 	assert(not response_schema.is_empty())
 	assert(bool(response_schema.get("strict", false)))
@@ -525,28 +602,25 @@ func _check_witch_poison_targets_exclude_save_target(page) -> void:
 	assert((schema_body["required"] as Array).has("action"))
 	assert((schema_body["required"] as Array).has("targetSeatNumber"))
 	var properties: Dictionary = schema_body["properties"] as Dictionary
+	assert(((properties["action"] as Dictionary).get("enum", []) as Array) == ["witch_act"])
+	assert(String((properties["action"] as Dictionary).get("description", "")) == "本次行动：女巫用药。固定值。")
+	assert(String((properties["targetSeatNumber"] as Dictionary).get("description", "")) == "目标座位号。-1 表示不用药。")
 	assert((properties["targetSeatNumber"] as Dictionary).has("enum"))
 	assert(((properties["targetSeatNumber"] as Dictionary).get("enum", []) as Array).has(-1))
 	assert(((properties["targetSeatNumber"] as Dictionary).get("enum", []) as Array).has(2))
-	var variants: Array = schema_body.get("anyOf", []) as Array
-	assert(variants.size() >= 3)
-	assert(_schema_variant_has_action_target(variants, "witch_save", 2))
-	assert(_schema_variant_has_action_target(variants, "witch_skip", -1))
-	assert(_schema_variant_has_action_target(variants, "witch_poison", 3))
-	var poison_save_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_poison\",\"targetSeatNumber\":2}", context)
-	assert(not bool(poison_save_target.get("ok", false)))
-	var poison_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_poison\",\"targetSeatNumber\":3}", context)
+	assert(((properties["targetSeatNumber"] as Dictionary).get("enum", []) as Array).has(3))
+	assert(not schema_body.has("anyOf"))
+	var poison_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_act\",\"targetSeatNumber\":3}", context)
 	assert(bool(poison_decision.get("ok", false)))
+	assert(String(poison_decision.get("action", "")) == "witch_poison")
 	assert(int(poison_decision.get("target_index", -1)) == 2)
-	var save_no_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_save\",\"targetSeatNumber\":-1}", context)
-	assert(not bool(save_no_target.get("ok", false)))
-	var skip_no_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_skip\",\"targetSeatNumber\":-1}", context)
+	var skip_no_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_act\",\"targetSeatNumber\":-1}", context)
 	assert(bool(skip_no_target.get("ok", false)))
-	var save_real_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_save\",\"targetSeatNumber\":2}", context)
+	assert(String(skip_no_target.get("action", "")) == "witch_skip")
+	var save_real_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_act\",\"targetSeatNumber\":2}", context)
 	assert(bool(save_real_target.get("ok", false)))
+	assert(String(save_real_target.get("action", "")) == "witch_save")
 	assert(int(save_real_target.get("target_index", -1)) == 1)
-	var save_poison_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_save\",\"targetSeatNumber\":3}", context)
-	assert(not bool(save_poison_target.get("ok", false)))
 
 
 func _check_hunter_shoot_schema_and_parser(page) -> void:
@@ -567,7 +641,7 @@ func _check_hunter_shoot_schema_and_parser(page) -> void:
 		"post_game": {"stage": ""},
 	}
 	var context: Dictionary = page._bot_action_context(0, "hunter_shoot", {})
-	assert((context["allowed_actions"] as Array) == ["hunter_shoot", "skip"])
+	assert((context["allowed_actions"] as Array) == ["hunter_shoot"])
 	var targets: Array = page._bot_runtime.target_options_for_context(context)
 	assert(targets.size() == 2)
 	var response_schema: Dictionary = page._bot_runtime.response_schema_for_context(context)
@@ -576,7 +650,10 @@ func _check_hunter_shoot_schema_and_parser(page) -> void:
 	var schema_body: Dictionary = response_schema["schema"] as Dictionary
 	assert((schema_body["required"] as Array).has("action"))
 	assert((schema_body["required"] as Array).has("targetSeatNumber"))
+	assert((((schema_body["properties"] as Dictionary)["action"] as Dictionary).get("enum", []) as Array) == ["hunter_shoot"])
+	assert(String((((schema_body["properties"] as Dictionary)["action"] as Dictionary).get("description", ""))) == "本次行动：猎人开枪或不开枪。固定值。")
 	var target_schema: Dictionary = (schema_body["properties"] as Dictionary)["targetSeatNumber"] as Dictionary
+	assert(String(target_schema.get("description", "")) == "目标座位号。-1 表示不开枪。")
 	var enum_values: Array = target_schema.get("enum", []) as Array
 	assert(enum_values.has(-1))
 	assert(enum_values.has(2))
@@ -584,14 +661,12 @@ func _check_hunter_shoot_schema_and_parser(page) -> void:
 
 	var shoot_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"hunter_shoot\",\"targetSeatNumber\":2}", context)
 	assert(bool(shoot_decision.get("ok", false)))
+	assert(String(shoot_decision.get("action", "")) == "hunter_shoot")
 	assert(int(shoot_decision.get("target_index", -1)) == 1)
-	var skip_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"skip\",\"targetSeatNumber\":-1}", context)
+	var skip_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"hunter_shoot\",\"targetSeatNumber\":-1}", context)
 	assert(bool(skip_decision.get("ok", false)))
+	assert(String(skip_decision.get("action", "")) == "skip")
 	assert(int(skip_decision.get("target_index", -1)) == -1)
-	var missing_skip_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"skip\"}", context)
-	assert(not bool(missing_skip_target.get("ok", false)))
-	var skip_with_real_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"skip\",\"targetSeatNumber\":2}", context)
-	assert(not bool(skip_with_real_target.get("ok", false)))
 	var missing_shoot_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"hunter_shoot\"}", context)
 	assert(not bool(missing_shoot_target.get("ok", false)))
 	var fractional_shoot_target: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"hunter_shoot\",\"targetSeatNumber\":2.5}", context)

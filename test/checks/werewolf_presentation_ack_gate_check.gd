@@ -87,9 +87,9 @@ func _initialize() -> void:
 	room._ensure_history_presentation_id(item)
 	var presentation_id: String = room._history_presentation_id(item)
 	room._register_presentation_ack_gate_for_history_item(item)
-	if not _expect(room._presentation_ack_gates.has(presentation_id), "gate is created for public item"):
+	if not _expect(room._presentation_ack_controller.has_gate(presentation_id), "gate is created for public item"):
 		return
-	var gate: Dictionary = room._presentation_ack_gates[presentation_id]
+	var gate: Dictionary = room._presentation_ack_controller.gate(presentation_id)
 	var expected: Array = gate.get("expected", [])
 	if not _expect(expected.size() == 3, "host + human peer + observer are expected"):
 		return
@@ -106,18 +106,18 @@ func _initialize() -> void:
 	if not _expect(room._auto_resolve_waiting_for_tts, "auto resolve waits on gate"):
 		return
 	room._host_apply_presentation_ack(0, {"presentationId": presentation_id, "participantId": "host", "source": "test"})
-	if not _expect(room._presentation_ack_gates.has(presentation_id), "gate still waits after host ack"):
+	if not _expect(room._presentation_ack_controller.has_gate(presentation_id), "gate still waits after host ack"):
 		return
 	room._host_apply_presentation_ack(11, {"presentationId": presentation_id, "source": "test"})
-	if not _expect(room._presentation_ack_gates.has(presentation_id), "gate still waits after human ack"):
+	if not _expect(room._presentation_ack_controller.has_gate(presentation_id), "gate still waits after human ack"):
 		return
 	room._host_apply_presentation_ack(12, {"presentationId": presentation_id, "source": "test"})
-	if not _expect(not room._presentation_ack_gates.has(presentation_id), "gate opens after all device acks"):
+	if not _expect(not room._presentation_ack_controller.has_gate(presentation_id), "gate opens after all device acks"):
 		return
 	if not _expect(room._auto_resolve_deferred_pending, "auto resolve is scheduled when gate opens"):
 		return
 
-	room._presentation_ack_gates.clear()
+	room._presentation_ack_controller.clear_gates()
 	room._room_network_session = FakeNetworkSessionWithPendingPeer.new()
 	var pending_peer_item := {
 		"speaker": "主持人",
@@ -128,19 +128,19 @@ func _initialize() -> void:
 	room._ensure_history_presentation_id(pending_peer_item)
 	var pending_peer_presentation_id: String = room._history_presentation_id(pending_peer_item)
 	room._register_presentation_ack_gate_for_history_item(pending_peer_item)
-	if not _expect(room._presentation_ack_gates.has(pending_peer_presentation_id), "gate is created for pending peer public item"):
+	if not _expect(room._presentation_ack_controller.has_gate(pending_peer_presentation_id), "gate is created for pending peer public item"):
 		return
-	var pending_peer_gate: Dictionary = room._presentation_ack_gates[pending_peer_presentation_id]
+	var pending_peer_gate: Dictionary = room._presentation_ack_controller.gate(pending_peer_presentation_id)
 	var pending_peer_expected: Array = pending_peer_gate.get("expected", [])
 	if not _expect(pending_peer_expected.has("host"), "pending peer gate still waits for host"):
 		return
 	if not _expect(pending_peer_expected.has("peer:21"), "pending peer device must ack public item"):
 		return
 	room._host_apply_presentation_ack(0, {"presentationId": pending_peer_presentation_id, "participantId": "host", "source": "test"})
-	if not _expect(room._presentation_ack_gates.has(pending_peer_presentation_id), "pending peer gate still waits after host ack"):
+	if not _expect(room._presentation_ack_controller.has_gate(pending_peer_presentation_id), "pending peer gate still waits after host ack"):
 		return
 	room._host_apply_presentation_ack(21, {"presentationId": pending_peer_presentation_id, "source": "test"})
-	if not _expect(not room._presentation_ack_gates.has(pending_peer_presentation_id), "pending peer ack opens public gate"):
+	if not _expect(not room._presentation_ack_controller.has_gate(pending_peer_presentation_id), "pending peer ack opens public gate"):
 		return
 
 	room.queue_free()

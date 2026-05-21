@@ -44,10 +44,21 @@ func _initialize() -> void:
 	assert(catalog.all_role_keys().size() == expected.size())
 	assert(catalog.role_key_from_enum(RoleCatalogScript.Role.SEER) == "seer")
 	assert(catalog.role_enum_from_key("lone_wolf") == RoleCatalogScript.Role.LONE_WOLF)
+	var avatars := {}
+	var titles := {}
 	for role_key in expected.keys():
 		assert(catalog.all_role_keys().has(role_key))
 		assert(catalog.role_label(role_key) == String(expected[role_key]))
 		assert(catalog.definition(role_key).get("key") == role_key)
+		assert(String(catalog.definition(role_key).get("title", "")) == catalog.role_title(role_key))
+		assert(catalog.role_title(role_key) != "")
+		assert(not titles.has(catalog.role_title(role_key)))
+		titles[catalog.role_title(role_key)] = role_key
+		var avatar := catalog.role_avatar(role_key)
+		assert(avatar.begins_with("res://assets/images/werewolf/avatars/roles/"))
+		assert(avatar.ends_with("%s.png" % role_key))
+		assert(not avatars.has(avatar))
+		avatars[avatar] = role_key
 		assert(not catalog.role_skills(role_key).is_empty())
 		assert(catalog.role_skill_text(role_key) != "")
 	assert(catalog.role_aliases("villager").has("平民"))

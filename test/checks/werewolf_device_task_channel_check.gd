@@ -9,6 +9,8 @@ func _initialize() -> void:
 	var task_id := String(task.get("id", ""))
 	if not _expect(task_id != "", "task id is assigned"):
 		return
+	if not _expect(task_id.begins_with("werewolf_task_"), "legacy task id prefix is preserved"):
+		return
 	if not _expect(channel.has_task(task_id), "task is stored"):
 		return
 	if not _expect(channel.has_pending_for_actor(2, ["player_action"]), "actor pending lookup works"):

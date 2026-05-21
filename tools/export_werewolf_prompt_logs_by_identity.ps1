@@ -67,7 +67,35 @@ if ($records.Count -eq 0) {
     $records = @($jsonArrayText | ConvertFrom-Json)
 }
 
+function Safe-FileName([string]$Value) {
+    $name = $Value.Trim()
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        $name = "unknown"
+    }
+    foreach ($char in [System.IO.Path]::GetInvalidFileNameChars()) {
+        $name = $name.Replace([string]$char, "_")
+    }
+    $name = ($name -replace "\s+", "_")
+    if ($name.Length -gt 80) {
+        $name = $name.Substring(0, 80)
+    }
+    return $name
+}
+
+function Append-Lines($Target, [string[]]$Source) {
+    foreach ($line in $Source) {
+        $Target.Add($line)
+    }
+}
+
+$identityDir = Join-Path $OutDir "by_identity"
+$playerDir = Join-Path $OutDir "by_player"
+New-Item -ItemType Directory -Force -Path $identityDir | Out-Null
+New-Item -ItemType Directory -Force -Path $playerDir | Out-Null
+
 $lines = New-Object System.Collections.Generic.List[string]
+$identityLines = @{}
+$playerLines = @{}
 $fallbackSequence = 0
 foreach ($record in $records) {
     $fallbackSequence += 1
@@ -82,7 +110,20 @@ foreach ($record in $records) {
     if ($sequence -le 0) {
         $sequence = $fallbackSequence
     }
-    $lines.Add(("===== #{0} 身份={1} 玩家={2} kind={3} action={4} =====" -f $sequence, $role, $record.actorTitle, $record.kind, $record.actionKey))
+    $actorTitle = [string]$record.actorTitle
+    $recordLines = New-Object System.Collections.Generic.List[string]
+    $payload = $record.modelRequestPayload
+    $payloadSchema = ""
+    $outputAdapter = ""
+    $reasonAdapter = ""
+    $reasoningMode = ""
+    if ($payload -ne $null) {
+        $payloadSchema = [string]$payload.payload_schema
+        $outputAdapter = [string]$payload.output_adapter
+        $reasonAdapter = [string]$payload.reason_adapter
+        $reasoningMode = [string]$payload.reasoning_mode
+    }
+    $recordLines.Add(("===== #{0} 身份={1} 玩家={2} kind={3} action={4} payload_schema={5} output_adapter={6} reason_adapter={7} reasoning_mode={8} =====" -f $sequence, $role, $actorTitle, $record.kind, $record.actionKey, $payloadSchema, $outputAdapter, $reasonAdapter, $reasoningMode))
     foreach ($message in $record.messages) {
         $messageRole = [string]$message.role
         $label = switch ($messageRole) {
@@ -90,12 +131,37 @@ foreach ($record in $records) {
             "user" { "USER"; break }
             default { $messageRole.ToUpperInvariant() }
         }
-        $lines.Add("")
-        $lines.Add("[$label]")
-        $lines.Add([string]$message.content)
+        $recordLines.Add("")
+        $recordLines.Add("[$label]")
+        $recordLines.Add([string]$message.content)
     }
-    $lines.Add("")
+    $recordLines.Add("")
+    Append-Lines $lines $recordLines
+
+    $identityKey = Safe-FileName $role
+    if (-not $identityLines.ContainsKey($identityKey)) {
+        $identityLines[$identityKey] = New-Object System.Collections.Generic.List[string]
+    }
+    Append-Lines $identityLines[$identityKey] $recordLines
+
+    $playerKey = Safe-FileName ("{0}_{1}" -f $actorTitle, $role)
+    if (-not $playerLines.ContainsKey($playerKey)) {
+        $playerLines[$playerKey] = New-Object System.Collections.Generic.List[string]
+    }
+    Append-Lines $playerLines[$playerKey] $recordLines
 }
 
 Set-Content -Path $textOut -Value $lines -Encoding UTF8
 Write-Host "exported $textOut"
+
+foreach ($key in $identityLines.Keys) {
+    $path = Join-Path $identityDir ("$key.txt")
+    Set-Content -Path $path -Value $identityLines[$key] -Encoding UTF8
+    Write-Host "exported $path"
+}
+
+foreach ($key in $playerLines.Keys) {
+    $path = Join-Path $playerDir ("$key.txt")
+    Set-Content -Path $path -Value $playerLines[$key] -Encoding UTF8
+    Write-Host "exported $path"
+}

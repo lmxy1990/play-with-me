@@ -11,6 +11,7 @@ func _initialize() -> void:
 	_check_dead_player_post_game_summary(engine)
 	_check_post_game_summary_to_mvp_completion(engine)
 	_check_win_conditions(engine)
+	_check_idiot_reveal_vote_flow(engine)
 	quit()
 
 
@@ -26,6 +27,9 @@ func _check_basic_day_vote_flow(engine) -> void:
 		if player is Dictionary and String((player as Dictionary).get("owner", "")) != "":
 			assert(String((player as Dictionary).get("role_key", "")) != "")
 			assert(String((player as Dictionary).get("role", "")) != "未知")
+			assert(String((player as Dictionary).get("role_title", "")) != "")
+			assert(String((player as Dictionary).get("role_avatar", "")).begins_with("res://assets/images/werewolf/avatars/roles/"))
+			assert(String((player as Dictionary).get("avatar", "")) == String((player as Dictionary).get("base_avatar", "")))
 
 	var guard := 0
 	while engine.is_night_phase(state) and guard < 8:
@@ -78,8 +82,8 @@ func _check_basic_day_vote_flow(engine) -> void:
 
 
 func _check_sheriff_guard_flow(engine) -> void:
-	var players := _players(6)
-	var result: Dictionary = engine.start_game("sheriff_guard_check", players, [0, 1, 2, 3, 4, 5], 0, "sheriff_guard_square")
+	var players := _players(12)
+	var result: Dictionary = engine.start_game("sheriff_guard_check", players, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], 0, "sheriff_guard_square")
 	assert(bool(result.get("ok", false)))
 	var state: Dictionary = result["werewolf"]
 	players = result["players"]
@@ -114,7 +118,7 @@ func _check_sheriff_guard_flow(engine) -> void:
 	var guard_actor := -1
 	var guard_target := -1
 	var night_steps := 0
-	while engine.is_night_phase(state) and night_steps < 8:
+	while engine.is_night_phase(state) and night_steps < 16:
 		night_steps += 1
 		var action: Dictionary = state.get("current_action", {})
 		if String(action.get("key", "")) == "guard_protect":
@@ -430,6 +434,46 @@ func _check_win_conditions(engine) -> void:
 	]
 	var good_win: Dictionary = engine._check_win(all_good_dead_state, good_win_players)
 	assert(String(good_win.get("winner", "")) == "good")
+
+
+func _check_idiot_reveal_vote_flow(engine) -> void:
+	var players := [
+		_role_player("idiot", true),
+		_role_player("wolf", true),
+		_role_player("villager", true),
+	]
+	var state := {
+		"phase": "vote",
+		"day": 1,
+		"map_id": "sheriff_square",
+		"wolf_win_condition": "slaughter_side",
+		"votes": {},
+		"night": {},
+		"current_action": {"key": "vote", "actor_index": 0, "label": "投票", "effect": "vote"},
+		"spoken_indices": [],
+		"post_game": {"stage": ""},
+	}
+	var first: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(bool(first.get("ok", false)))
+	state = first["werewolf"]
+	players = first["players"]
+	var second: Dictionary = engine.apply_target(state, players, 0, 0)
+	assert(bool(second.get("ok", false)))
+	state = second["werewolf"]
+	players = second["players"]
+	var third: Dictionary = engine.apply_target(state, players, 0, 0)
+	assert(bool(third.get("ok", false)))
+	state = third["werewolf"]
+	players = third["players"]
+	assert(bool((players[0] as Dictionary).get("alive", false)))
+	assert(bool((players[0] as Dictionary).get("idiot_revealed", false)))
+	assert(String(state.get("phase", "")) == "wolf_chat")
+	assert(int(state.get("day", 0)) == 2)
+
+	state["phase"] = "vote"
+	state["current_action"] = {"key": "vote", "actor_index": 0, "label": "投票", "effect": "vote"}
+	var blocked: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(not bool(blocked.get("ok", false)))
 
 
 func _apply_prompt_target(engine, state: Dictionary, players: Array) -> Dictionary:

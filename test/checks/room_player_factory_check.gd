@@ -1,6 +1,6 @@
 extends SceneTree
 
-const FactoryScript := preload("res://scripts/room/room_player_factory.gd")
+const FactoryScript := preload("res://scripts/player/player_factory.gd")
 const BOT_AVATAR := "res://assets/images/werewolf/avatars/robot.png"
 
 
@@ -26,6 +26,8 @@ func _initialize() -> void:
 	assert(String(human.get("owner", "")) == "human")
 	assert(factory.visible_role_for_player(human) == "未知")
 	human["alive"] = false
+	assert(factory.visible_role_for_player(human) == "未知")
+	human["role_visible"] = true
 	assert(factory.visible_role_for_player(human) == "狼人")
 
 	var bot_a: Dictionary = factory.bot_player(1, "机器人1", "host", 0)

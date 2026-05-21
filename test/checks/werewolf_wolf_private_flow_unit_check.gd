@@ -1,6 +1,6 @@
 extends SceneTree
 
-const FlowScript := preload("res://scripts/room/werewolf/player/ai_robot/ai_werewolf_wolf_private_flow.gd")
+const FlowScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_wolf_private_flow.gd")
 
 var _legal_targets := {}
 

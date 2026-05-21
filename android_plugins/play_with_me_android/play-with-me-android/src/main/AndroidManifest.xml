@@ -1,0 +1,41 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <application>
+        <meta-data
+            android:name="org.godotengine.plugin.v2.PlayWithMeAndroid"
+            android:value="com.playwithme.godot.PlayWithMeAndroid" />
+
+        <activity
+            android:name=".QrScannerActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@style/Theme.PlayWithMe.Scanner" />
+
+        <service
+            android:name=".PlayWithMeTtsService"
+            android:exported="true"
+            android:label="@string/play_with_me_tts_engine_name"
+            android:permission="android.permission.BIND_TEXT_SERVICE">
+            <intent-filter>
+                <action android:name="android.intent.action.TTS_SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech.tts"
+                android:resource="@xml/play_with_me_tts_engine" />
+        </service>
+
+        <receiver
+            android:name=".TtsDebugReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.playwithme.godot.TTS_DEBUG_SNAPSHOT" />
+                <action android:name="com.playwithme.godot.TTS_DEBUG_SPEAK" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

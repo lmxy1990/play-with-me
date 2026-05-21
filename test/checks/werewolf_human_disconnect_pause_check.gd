@@ -99,7 +99,7 @@ func _check_disconnect_pauses_and_reconnect_resumes() -> void:
 	room._ensure_history_presentation_id(item)
 	var presentation_id: String = room._history_presentation_id(item)
 	room._register_presentation_ack_gate_for_history_item(item)
-	if not _expect(room._presentation_ack_gates.has(presentation_id), "ack gate exists before disconnect"):
+	if not _expect(room._presentation_ack_controller.has_gate(presentation_id), "ack gate exists before disconnect"):
 		return
 	var task: Dictionary = room._create_device_task_for_actor("player_speech", 1, {"question": "请发言"})
 	if not _expect(not task.is_empty(), "device task exists before disconnect"):
@@ -112,7 +112,7 @@ func _check_disconnect_pauses_and_reconnect_resumes() -> void:
 		return
 	if not _expect(String(room._players[1].get("state", "")) == "离线", "disconnected player is offline"):
 		return
-	if not _expect(not room._presentation_ack_gates.has(presentation_id), "disconnect drops ack gate participant"):
+	if not _expect(not room._presentation_ack_controller.has_gate(presentation_id), "disconnect drops ack gate participant"):
 		return
 	if not _expect(not room._device_task_channel.has_task(String(task.get("id", ""))), "disconnect drops pending device task"):
 		return
