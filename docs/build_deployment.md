@@ -44,6 +44,7 @@ C:\Users\Administrator\AppData\Roaming\Godot\keystores\debug.keystore
 - `tools/sync_android_plugin_aar.ps1`：只同步已有 AAR 到 `addons/play_with_me_android/bin/`。
 - `tools/export_android_debug_fast.ps1`：快速导出 debug APK。
 - `tools/export_android_release.ps1`：导出 release APK。
+- `tools/publish_android_release.ps1`：构建 release AAR、导出 3 个 release APK，并创建/更新 GitHub release。
 - `tools/install_android_apk.ps1`：安装已有 APK 到 adb 当前在线设备。
 - `tools/push_android_fast.ps1`：快速导出 debug APK 并安装到 adb 当前在线设备。
 
@@ -142,6 +143,25 @@ release 脚本会临时开启：
 
 正式发版前需要在 `export_presets.cfg` 中补齐 release keystore、版本号和目标 ABI。
 
+## 发布 1.1.0
+
+现成的发版脚本会先构建 release AAR，再导出下面 3 个安装包：
+
+- `builds\android\play-with-me-release-arm64-v8a.apk`
+- `builds\android\play-with-me-release-x86_64.apk`
+- `builds\android\play-with-me-release-universal.apk`
+
+一键构建并发布 GitHub release：
+
+```powershell
+临时设置 release 签名密码，不要写入仓库：
+$env:PLAY_WITH_ME_RELEASE_KEYSTORE_PASSWORD = "<release-keystore-password>"
+
+.\tools\publish_android_release.ps1
+```
+
+脚本会复用现有的 `gh` 登录态创建或更新 `v1.1.0` release，不会把账号 token 或本地 git 敏感信息写进仓库。
+
 ## 安装和推送
 
 先查看当前在线设备：
@@ -203,7 +223,7 @@ Android 预设文件：`export_presets.cfg`
 
 - 预设名称：`Android`
 - 包名：`com.playwithme.godot`
-- 版本名：`0.1.0`
+- 版本名：`1.1.0`
 - Gradle build：启用
 - 相机、网络、Wi-Fi 状态和多播权限：启用
 - Debug keystore：`C:/Users/Administrator/AppData/Roaming/Godot/keystores/debug.keystore`
