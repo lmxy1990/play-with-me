@@ -47,6 +47,9 @@ C:\Users\Administrator\AppData\Roaming\Godot\keystores\debug.keystore
 - `tools/publish_android_release.ps1`：构建 release AAR、导出 3 个 release APK，并创建/更新 GitHub release。
 - `tools/install_android_apk.ps1`：安装已有 APK 到 adb 当前在线设备。
 - `tools/push_android_fast.ps1`：快速导出 debug APK 并安装到 adb 当前在线设备。
+- `tools/export_werewolf_prompt_logs.ps1`：从 Android debug 包导出狼人杀 AI prompt 原始日志，可顺便解析。
+- `tools/parse_werewolf_prompt_logs.ps1`：离线解析狼人杀 AI prompt JSONL，按座位、身份和玩家拆分上下文并生成告警报告。
+- `tools/replay_werewolf_model_request.ps1`：复放某一次狼人杀 AI 模型请求，定位供应商响应问题。
 
 ## Android 插件 AAR
 
@@ -262,6 +265,43 @@ TTS debug-only 诊断接口：
 .\test\android\tts_debug_speak.ps1 -Device <serial> -Engine voxsherpa_tts -Voice zf_024 -Text "这是 VoxSherpa 的调试播放测试，座位 12 号，数值 3.14。" -WarmUp
 .\test\android\tts_debug_speak.ps1 -Device <serial> -Engine multi_tts -Voice zm_010 -Text "这是 MultiTTS 的调试播放测试，二十一 个苹果，2026 年。" -WarmUp
 & "D:\android\platform-tools\adb.exe" -s <serial> logcat -b crash -d -v time
+```
+
+狼人杀 AI prompt 调试：
+
+```powershell
+.\tools\export_werewolf_prompt_logs.ps1 -Device <serial> -Parse
+```
+
+常用输出位于 `exports\werewolf_prompt_logs_<timestamp>\`：
+
+- `raw_werewolf_bot_prompts.jsonl`：设备内原始模型请求上下文日志。
+- `actual_model_prompts_by_seat.txt`：按记录顺序汇总后的完整 prompt 文本。
+- `actual_model_prompts_by_identity.txt`：按身份汇总后的完整 prompt 文本，兼容旧导出入口。
+- `by_seat\`：按座位和身份拆分后的上下文，适合逐座位检查。
+- `by_identity\`：按身份拆分后的上下文。
+- `by_player\`：按玩家标题和身份拆分后的上下文。
+- `prompt_summary.csv`：每条请求的座位、身份、阶段、模型配置和上下文摘要。
+- `prompt_warnings.csv`：静态分析告警，例如首夜前发言声称查验、prompt 缺少公开发言约束、身份可见性异常。
+- `prompt_analysis.md`：面向人工排查的 Markdown 摘要。
+
+只解析已有导出：
+
+```powershell
+.\tools\parse_werewolf_prompt_logs.ps1 -InputDir exports\werewolf_prompt_logs_<timestamp>
+.\tools\parse_werewolf_prompt_logs.ps1 -RawJsonl exports\werewolf_prompt_logs_<timestamp>\raw_werewolf_bot_prompts.jsonl
+```
+
+兼容旧入口仍可用：
+
+```powershell
+.\tools\export_werewolf_prompt_logs_by_identity.ps1 -Device <serial>
+```
+
+需要复放某条模型请求时，先看 `prompt_summary.csv` 或 `prompt_analysis.md` 的 `sequence`，再执行：
+
+```powershell
+.\tools\replay_werewolf_model_request.ps1 -Device <serial> -Sequence <sequence>
 ```
 
 ## Android 插件能力

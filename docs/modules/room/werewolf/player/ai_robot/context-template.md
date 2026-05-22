@@ -107,3 +107,22 @@ current_question 是本次唯一需要回答的问题。
 4. 最近的 `timeline`。
 5. 与当前问题最相关的 `memoryHints`。
 6. 较早历史由程序压缩成摘要后放入记忆字段。
+
+## 调试导出
+
+Android debug 包会把狼人杀 AI 模型请求上下文写入应用私有文件，排查实机 prompt 时使用工具脚本导出：
+
+```powershell
+.\tools\export_werewolf_prompt_logs.ps1 -Device <serial> -Parse
+```
+
+脚本会生成：
+
+- `raw_werewolf_bot_prompts.jsonl`：原始请求记录。
+- `by_seat\`：按座位和身份拆分的上下文文件。
+- `by_identity\`：按身份拆分的上下文文件。
+- `prompt_summary.csv`：请求索引和模型配置摘要。
+- `prompt_warnings.csv`：静态告警，用于快速发现首夜前编造夜间结果、公开发言约束缺失和身份可见性异常。
+- `prompt_analysis.md`：Markdown 摘要，适合人工复盘。
+
+只有已经触发模型请求的座位会出现在导出结果里；未轮到发言或行动的座位不会有上下文记录。
