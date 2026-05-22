@@ -21,7 +21,7 @@ var _role_catalog = RoleCatalogScript.new()
 
 
 func default_wolf_condition_key(player_count: int) -> String:
-	return SLAUGHTER_SIDE if player_count >= 12 else ALL_GOOD_DEAD
+	return SLAUGHTER_SIDE if player_count > 6 else ALL_GOOD_DEAD
 
 
 func condition_text(condition_key: String) -> String:

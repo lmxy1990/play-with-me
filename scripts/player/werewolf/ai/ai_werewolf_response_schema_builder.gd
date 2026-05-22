@@ -43,7 +43,7 @@ func response_schema_for_context(context: Dictionary) -> Dictionary:
 	if needs_target:
 		var target_schema := {
 			"type": "integer",
-			"description": _target_description(actions),
+			"description": _target_description(context, actions),
 		}
 		var allowed_target_seats := target_seats.duplicate()
 		if not allowed_target_seats.is_empty():
@@ -124,7 +124,7 @@ func _action_label(action: String) -> String:
 			return action
 
 
-func _target_description(actions: Array) -> String:
+func _target_description(context: Dictionary, actions: Array) -> String:
 	if actions.has("sheriff_vote"):
 		return "警长投票目标座位号。"
 	if actions.has("vote"):
@@ -136,7 +136,7 @@ func _target_description(actions: Array) -> String:
 	if actions.has("guard_protect"):
 		return "守护目标座位号。"
 	if actions.has("witch_act"):
-		return "目标座位号。-1 表示不用药。"
+		return _witch_act_target_description(context)
 	if actions.has("hunter_shoot"):
 		return "目标座位号。-1 表示不开枪。"
 	if actions.has("sheriff_speech_order"):
@@ -146,6 +146,22 @@ func _target_description(actions: Array) -> String:
 	if actions.has("mvp_vote"):
 		return "MVP 投票目标座位号。"
 	return "目标座位号。"
+
+
+func _witch_act_target_description(context: Dictionary) -> String:
+	var has_save := false
+	var has_poison := false
+	for option in _target_options(context):
+		var target_actions := _string_array((option as Dictionary).get("targetActions", []))
+		has_save = has_save or target_actions.has("witch_save")
+		has_poison = has_poison or target_actions.has("witch_poison")
+	if has_save and has_poison:
+		return "女巫用药选择。-1 表示不用药；今晚被袭击座位表示使用解药；其它合法座位表示使用毒药。"
+	if has_save:
+		return "女巫用药选择。-1 表示不使用解药；今晚被袭击座位表示使用解药。"
+	if has_poison:
+		return "女巫用药选择。-1 表示不使用毒药；其它合法座位表示使用毒药。"
+	return "女巫用药选择。-1 表示不用药。"
 
 
 func _is_single_speech_action(actions: Array) -> bool:

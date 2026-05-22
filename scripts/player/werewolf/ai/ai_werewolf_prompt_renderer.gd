@@ -87,7 +87,13 @@ func _current_state_prompt_lines(visible_state: Dictionary) -> Array:
 
 func _user_input_format_prompt_lines() -> Array:
 	return [
-		"输入：user 是 JSON；current_question 是问题；current_state/players/timeline/memoryHints 是资料；targetOptions 是合法目标座位号数组。只依据输入，未知不编。",
+		"current_question：本次需要回答的问题。",
+		"current_state：只表示当前阶段和系统已结算状态。",
+		"players：只表示当前视角可见的玩家列表。",
+		"timeline：只表示本局当前视角可见的记录，包括发言和行动。",
+		"memoryHints：我的历史记忆摘要。",
+		"targetOptions：可选座位列表，-1 表示不选择目标。",
+		"你必须按照输出格式要求，只回答 current_question 对应的问题。",
 	]
 
 
@@ -100,7 +106,7 @@ func _speech_output_format_prompt_lines() -> Array:
 func _action_output_format_prompt_lines(context: Dictionary) -> Array:
 	var allowed_actions := _string_array(context.get("allowed_actions", []))
 	var action_value := String(allowed_actions[0]) if allowed_actions.size() == 1 else ""
-	var target_rule := _target_rule_text(allowed_actions)
+	var target_rule := _target_rule_text(context, allowed_actions)
 	var target_suffix := "；%s" % target_rule if target_rule != "" else ""
 	if action_value == "sheriff_speech_order":
 		return [
@@ -158,13 +164,13 @@ func _action_label(action: String) -> String:
 			return action
 
 
-func _target_rule_text(allowed_actions: Array) -> String:
+func _target_rule_text(context: Dictionary, allowed_actions: Array) -> String:
 	if allowed_actions.has("witch_save"):
 		return "今晚被袭击座位表示救人"
 	if allowed_actions.has("witch_poison"):
 		return "目标表示毒人"
 	if allowed_actions.has("witch_act"):
-		return "-1 表示不用药；今晚被袭击座位表示救人；其他合法座位表示毒人"
+		return _witch_act_target_rule_text(context)
 	if allowed_actions.has("sheriff_badge_destroy"):
 		return "-1 表示撕警徽"
 	if allowed_actions.has("sheriff_badge_action"):
@@ -176,6 +182,24 @@ func _target_rule_text(allowed_actions: Array) -> String:
 	if allowed_actions.has("hunter_shoot"):
 		return "-1 表示不开枪"
 	return ""
+
+
+func _witch_act_target_rule_text(context: Dictionary) -> String:
+	var has_save := false
+	var has_poison := false
+	for option in target_options_for_context(context):
+		if not (option is Dictionary):
+			continue
+		var target_actions := _string_array((option as Dictionary).get("targetActions", []))
+		has_save = has_save or target_actions.has("witch_save")
+		has_poison = has_poison or target_actions.has("witch_poison")
+	if has_save and has_poison:
+		return "-1 表示不用药；今晚被袭击座位表示使用解药；其它合法座位表示使用毒药"
+	if has_save:
+		return "-1 表示不使用解药；今晚被袭击座位表示使用解药"
+	if has_poison:
+		return "-1 表示不使用毒药；其它合法座位表示使用毒药"
+	return "-1 表示不用药"
 
 
 func _is_single_speech_context(context: Dictionary) -> bool:

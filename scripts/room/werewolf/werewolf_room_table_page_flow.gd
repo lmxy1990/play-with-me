@@ -161,6 +161,8 @@ func _resolve_pending_action(target_index: int, action_name: String = "") -> voi
 func _refresh_center_panel() -> void:
 	if _center_body == null:
 		return
+	if _refresh_existing_center_speech_view():
+		return
 	for child in _center_body.get_children():
 		child.queue_free()
 	if _center_panel != null:
@@ -184,6 +186,34 @@ func _center_idle_view() -> Control:
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	return label
+
+
+func _refresh_existing_center_speech_view() -> bool:
+	if _center_speech_items.is_empty() or not (_center_speech_items.back() is Dictionary):
+		return false
+	if _center_body.get_child_count() != 1:
+		return false
+	var root := _center_body.get_child(0) as Control
+	if root == null or String(root.name) != "CenterSpeechEntry":
+		return false
+	var entry: Dictionary = _center_speech_items.back()
+	if String(root.get_meta("center_speech_match_key", "")) != String(entry.get("match_key", "")):
+		return false
+	_center_body.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var speaker_label := root.find_child("CenterSpeechSpeakerLabel", true, false) as Label
+	if speaker_label != null:
+		var active := bool(entry.get("active", false))
+		var seat := String(entry.get("seat", "")).strip_edges()
+		var name := String(entry.get("name", entry.get("speaker", ""))).strip_edges()
+		speaker_label.text = "%s %s" % [seat, name] if seat != "" else name
+		speaker_label.add_theme_color_override("font_color", TEAL if active else GOLD)
+	var text_label := root.find_child("CenterSpeechTextLabel", true, false) as Label
+	if text_label != null:
+		text_label.text = _center_speech_visible_text(entry)
+	var scroll := root.find_child("CenterSpeechTextScroll", true, false) as ScrollContainer
+	if scroll != null:
+		call_deferred("_scroll_center_speech_text_to_progress", scroll, float(entry.get("progress", 1.0)))
+	return true
 
 
 func _finish_speech(_text: String) -> void:
@@ -226,18 +256,8 @@ func _finish_speech(_text: String) -> void:
 	_flash_effect("skip")
 
 
-func _show_history_toast_item(item: Dictionary) -> void:
-	var speaker := String(item.get("speaker", "")).strip_edges()
-	if speaker == "试听":
-		return
-	if _speaker_index_for_history(speaker) >= 0:
-		return
-	var text := _center_speech_display_text(item)
-	if text == "":
-		return
-	var message := text if speaker in ["主持人", "房间", "系统"] else "%s：%s" % [speaker, text]
-	if has_method("_show_system_progress_toast"):
-		call("_show_system_progress_toast", message)
+func _show_history_toast_item(_item: Dictionary) -> void:
+	pass
 
 
 func _show_center_speech_item_from_history(item: Dictionary, wait_for_tts: bool = false) -> void:
@@ -498,6 +518,7 @@ func _fill_center_speech_display() -> void:
 func _center_speech_entry_view(entry: Dictionary) -> Control:
 	var root := VBoxContainer.new()
 	root.name = "CenterSpeechEntry"
+	root.set_meta("center_speech_match_key", String(entry.get("match_key", "")))
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 8)

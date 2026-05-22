@@ -137,9 +137,33 @@ function Get-KnownRoleText($UserPrompt) {
     return ($items -join ", ")
 }
 
+function Has-IdiotVoteRevealEvidence($UserPrompt, [int]$Seat) {
+    if ($UserPrompt -eq $null -or -not ($UserPrompt.timeline -is [Array]) -or $Seat -le 0) {
+        return $false
+    }
+
+    $seatText = [regex]::Escape([string]$Seat)
+    foreach ($line in $UserPrompt.timeline) {
+        $text = [string]$line
+        if (
+            ($text -match ("{0}\s*号.*被投票放逐.*白痴翻牌" -f $seatText)) -or
+            ($text -match ("{0}\s*号.*白痴翻牌.*投票" -f $seatText)) -or
+            ($text -match ("{0}\s*号.*白痴翻牌免于出局" -f $seatText))
+        ) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Get-VisibleRoleWarnings($Record, $UserPrompt) {
     $warnings = New-Object System.Collections.Generic.List[object]
     if ($UserPrompt -eq $null -or -not ($UserPrompt.players -is [Array])) {
+        return $warnings
+    }
+
+    $phase = [string]$Record.phase
+    if ($phase -in @("post_game_summary", "mvp_vote", "game_over", "completed")) {
         return $warnings
     }
 
@@ -149,6 +173,9 @@ function Get-VisibleRoleWarnings($Record, $UserPrompt) {
         $seat = [int]$player.seatNumber
         $role = [string]$player.role
         if ([string]::IsNullOrWhiteSpace($role) -or $role -eq "未知") {
+            continue
+        }
+        if ($role -eq "白痴" -and (Has-IdiotVoteRevealEvidence $UserPrompt $seat)) {
             continue
         }
 
@@ -196,11 +223,8 @@ function Get-PromptPolicyWarnings($Record, [string]$SystemPrompt, $UserPrompt) {
     $role = Get-RecordRole $Record
     $state = if ($UserPrompt -ne $null) { [string]$UserPrompt.current_state } else { "" }
 
-    if ($kind -eq "speech" -and ($state -match "首夜前|无夜间技能结果") -and ($SystemPrompt -notmatch "不得.*(昨晚|查验|查杀|金水|夜间结果|夜晚结果)")) {
-        Add-Warning $warnings "missing_pre_night_speech_guard" "首夜前发言 prompt 没有明确禁止声称已发生夜间技能或查验结果。" "system prompt lacks explicit pre-night public-speech guard"
-    }
-
-    if ($kind -eq "speech" -and $role -eq "狼人" -and ($SystemPrompt -notmatch "公开.*(不要|不得).*暴露|不要.*暴露.*狼队友|隐藏.*身份")) {
+    $isPublicSpeech = $phase -in @("sheriff_speech", "day_discussion", "last_words")
+    if ($kind -eq "speech" -and $isPublicSpeech -and $role -eq "狼人" -and ($SystemPrompt -notmatch "公开.*(不要|不得).*暴露|不要.*暴露.*狼队友|隐藏.*身份")) {
         Add-Warning $warnings "missing_wolf_public_privacy_guard" "狼人公开发言 prompt 没有明确要求隐藏狼队友和真实身份。" "system prompt lacks wolf public speech privacy guard"
     }
 
@@ -452,7 +476,6 @@ if ($warningRows.Count -eq 0) {
 $summaryMd.Add("")
 $summaryMd.Add("## Prompt Review Notes")
 $summaryMd.Add("")
-$summaryMd.Add('- `missing_pre_night_speech_guard`: 首夜前公开发言需要明确禁止声称已经查验、被刀、救人、毒人或守护。')
 $summaryMd.Add('- `ambiguous_no_fabrication_rule`: `未知不编` 对狼人杀不够精确；建议区分“可以策略伪装”和“不能编造系统事实或未发生夜间结果”。')
 $summaryMd.Add('- `missing_wolf_public_privacy_guard`: 狼人公开发言应明确要求不要暴露狼队友和真实身份。')
 

@@ -102,10 +102,27 @@ func _check_role_visibility(builder, runtime) -> void:
 	idiot["role"] = "白痴"
 	idiot["role_key"] = "idiot"
 	idiot["idiot_revealed"] = true
+	idiot["idiot_reveal_source"] = "vote_exile"
 	(reveal_input["players"] as Array)[3] = idiot
 	var reveal_payload: Dictionary = runtime.to_model_payload(builder.speech_context(reveal_input, 2, {}))
 	var reveal_players: Array = reveal_payload["players"]
 	assert(String((reveal_players[3] as Dictionary).get("role", "")) == "白痴")
+
+	var non_vote_reveal_input := _input()
+	var non_vote_idiot: Dictionary = (non_vote_reveal_input["players"] as Array)[3]
+	non_vote_idiot["role"] = "白痴"
+	non_vote_idiot["role_key"] = "idiot"
+	non_vote_idiot["idiot_revealed"] = true
+	(non_vote_reveal_input["players"] as Array)[3] = non_vote_idiot
+	var non_vote_payload: Dictionary = runtime.to_model_payload(builder.speech_context(non_vote_reveal_input, 2, {}))
+	var non_vote_players: Array = non_vote_payload["players"]
+	assert(String((non_vote_players[3] as Dictionary).get("role", "")) == "未知")
+
+	non_vote_idiot["idiot_reveal_source"] = "hunter_shoot"
+	(non_vote_reveal_input["players"] as Array)[3] = non_vote_idiot
+	var wrong_source_payload: Dictionary = runtime.to_model_payload(builder.speech_context(non_vote_reveal_input, 2, {}))
+	var wrong_source_players: Array = wrong_source_payload["players"]
+	assert(String((wrong_source_players[3] as Dictionary).get("role", "")) == "未知")
 
 
 func _check_timeline_compression(builder) -> void:

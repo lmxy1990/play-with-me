@@ -162,6 +162,7 @@ func visible_players(input: Dictionary, viewer_index: int) -> Array:
 	var result := []
 	var counts := visible_vote_counts(input)
 	var werewolf := _werewolf(input)
+	var phase := String(werewolf.get("phase", ""))
 	var night: Dictionary = werewolf.get("night", {})
 	var wolf_target := int(night.get("wolf_target_index", -1))
 	var players := _players(input)
@@ -179,7 +180,7 @@ func visible_players(input: Dictionary, viewer_index: int) -> Array:
 		}
 		if counts.has(id):
 			visible["voteCount"] = int(counts[id])
-		if i == wolf_target and can_view_night_target(input, viewer_index):
+		if phase in ["wolf_chat", "wolf_action", "guard_action", "seer_action", "witch_action"] and i == wolf_target and can_view_night_target(input, viewer_index) and (phase != "witch_action" or witch_can_save(input)):
 			visible["nightTargeted"] = true
 		var role_key := visible_role_key(input, viewer_index, i)
 		if role_key != "":
@@ -195,6 +196,10 @@ func state_facts(input: Dictionary, viewer_index: int) -> Array:
 	var day := int(werewolf.get("day", 0))
 	if day <= 1 and phase in ["sheriff_speech", "sheriff_vote"]:
 		facts.append("本局尚未进入首夜，所有玩家都还没有夜间技能结果。")
+	if phase in ["day_discussion", "vote", "last_words", "hunter_action"]:
+		var night_result := _latest_public_night_result(input)
+		if night_result != "":
+			facts.append(night_result)
 	var role_key := player_role_key(input, viewer_index)
 	match role_key:
 		"seer":
@@ -208,9 +213,7 @@ func state_facts(input: Dictionary, viewer_index: int) -> Array:
 			if last_guarded < 0:
 				facts.append("你没有上一夜守护记录。")
 		"witch":
-			var night: Dictionary = werewolf.get("night", {})
-			if int(night.get("wolf_target_index", -1)) < 0:
-				facts.append("你当前没有可见的夜间被刀信息。")
+			pass
 	return facts
 
 
@@ -623,7 +626,21 @@ func wolf_chat_instruction() -> String:
 
 
 func action_instruction_for_actor(input: Dictionary, actor_index: int, action_key: String) -> String:
+	if action_key == "witch_act":
+		return witch_action_instruction(input, actor_index)
 	return action_instruction(action_key)
+
+
+func witch_action_instruction(input: Dictionary, actor_index: int) -> String:
+	var can_save := witch_can_save(input)
+	var can_poison := witch_can_poison(input, actor_index)
+	if can_save and can_poison:
+		return "选择救人、毒人或跳过。"
+	if can_save:
+		return "选择是否解救。"
+	if can_poison:
+		return "选择是否毒人。"
+	return "选择是否用药。"
 
 
 func speech_action_for_phase(input: Dictionary) -> String:
@@ -730,7 +747,12 @@ func visible_role_key(input: Dictionary, viewer_index: int, target_index: int) -
 func is_role_publicly_revealed(player: Dictionary) -> bool:
 	return bool(player.get("role_visible", false)) \
 		or bool(player.get("roleVisible", false)) \
-		or bool(player.get("idiot_revealed", false))
+		or _idiot_publicly_revealed_by_vote(player)
+
+
+func _idiot_publicly_revealed_by_vote(player: Dictionary) -> bool:
+	return bool(player.get("idiot_revealed", false)) \
+		and String(player.get("idiot_reveal_source", player.get("role_reveal_source", ""))) == "vote_exile"
 
 
 func known_wolf_ids(input: Dictionary, viewer_index: int) -> Array:
@@ -769,10 +791,10 @@ func private_info(input: Dictionary, viewer_index: int) -> Dictionary:
 		var last_guarded := int(werewolf.get("last_guarded_index", -1))
 		if last_guarded >= 0:
 			info["lastGuardedPlayerId"] = player_id_for_index(input, last_guarded)
-	if role_key == "witch":
+	if role_key == "witch" and String(werewolf.get("phase", "")) == "witch_action":
 		var night: Dictionary = werewolf.get("night", {})
 		var killed := int(night.get("wolf_target_index", -1))
-		if killed >= 0:
+		if killed >= 0 and witch_can_save(input):
 			info["tonightKilledPlayerId"] = player_id_for_index(input, killed)
 		info["antidoteAvailable"] = bool(werewolf.get("witch_antidote", true))
 		info["poisonAvailable"] = bool(werewolf.get("witch_poison", true))
@@ -805,12 +827,22 @@ func can_view_wolf_private_history(input: Dictionary, viewer_index: int) -> bool
 
 
 func witch_can_save(input: Dictionary) -> bool:
+	if String(_werewolf(input).get("phase", "")) != "witch_action":
+		return false
 	var night: Dictionary = _werewolf(input).get("night", {})
 	var wolf_target := int(night.get("wolf_target_index", -1))
-	return wolf_target >= 0 and bool(_werewolf(input).get("witch_antidote", true))
+	if not bool(_werewolf(input).get("witch_antidote", true)):
+		return false
+	var players := _players(input)
+	if wolf_target < 0 or wolf_target >= players.size():
+		return false
+	var player: Dictionary = players[wolf_target]
+	return String(player.get("owner", "")) != "" and bool(player.get("alive", true))
 
 
 func witch_can_poison(input: Dictionary, actor_index: int) -> bool:
+	if String(_werewolf(input).get("phase", "")) != "witch_action":
+		return false
 	if not bool(_werewolf(input).get("witch_poison", true)):
 		return false
 	var players := _players(input)
@@ -818,6 +850,23 @@ func witch_can_poison(input: Dictionary, actor_index: int) -> bool:
 		if i != actor_index and String(players[i].get("owner", "")) != "" and bool(players[i].get("alive", true)):
 			return true
 	return false
+
+
+func _latest_public_night_result(input: Dictionary) -> String:
+	var history := _array(input.get("history", []))
+	for i in range(history.size() - 1, -1, -1):
+		var item = history[i]
+		if not (item is Dictionary):
+			continue
+		var entry: Dictionary = item
+		if String(entry.get("visibility", "public")) != "public":
+			continue
+		if String(entry.get("speaker", "")) != "主持人":
+			continue
+		var text := String(entry.get("text", "")).strip_edges()
+		if text.begins_with("昨夜平安夜") or text.begins_with("昨夜死亡"):
+			return text
+	return ""
 
 
 func visible_vote_counts(input: Dictionary) -> Dictionary:

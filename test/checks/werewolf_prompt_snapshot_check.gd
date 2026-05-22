@@ -12,7 +12,7 @@ func _initialize() -> void:
 	_assert_contract(runtime, builder.wolf_chat_context(input, 0, {}), "狼人", false, "发表狼队夜聊。")
 	_assert_contract(runtime, builder.action_context(input, 0, "wolf_kill", {}), "狼人", true, "选择今晚狼队击杀目标。")
 	_assert_contract(runtime, builder.action_context(input, 1, "seer_check", {}), "预言家", true, "选择今晚查验目标。")
-	_assert_contract(runtime, builder.action_context(input, 3, "witch_act", {}), "女巫", true, "选择救人、毒人或跳过。")
+	_assert_contract(runtime, builder.action_context(_witch_input(input), 3, "witch_act", {}), "女巫", true, "选择救人、毒人或跳过。")
 	_assert_contract(runtime, builder.action_context(input, 4, "guard_protect", {}), "守卫", true, "选择今晚守护目标。")
 	_assert_sheriff_campaign_contract(runtime, builder, input)
 	_assert_current_questions_are_simple(builder, input)
@@ -29,7 +29,13 @@ func _assert_contract(runtime, context: Dictionary, role_label: String, expects_
 
 	assert(system_content.contains("游戏规则："))
 	assert(system_content.contains("当前状态："))
-	assert(system_content.contains("输入：user 是 JSON"))
+	assert(system_content.contains("current_question：本次需要回答的问题。"))
+	assert(system_content.contains("current_state：只表示当前阶段和系统已结算状态。"))
+	assert(system_content.contains("players：只表示当前视角可见的玩家列表。"))
+	assert(system_content.contains("timeline：只表示本局当前视角可见的记录，包括发言和行动。"))
+	assert(system_content.contains("memoryHints：我的历史记忆摘要。"))
+	assert(system_content.contains("targetOptions：可选座位列表，-1 表示不选择目标。"))
+	assert(system_content.contains("你必须按照输出格式要求，只回答 current_question 对应的问题。"))
 	assert(system_content.contains("身份：%s" % role_label))
 	assert(system_content.contains("current_state"))
 	if expects_schema:
@@ -110,7 +116,7 @@ func _assert_current_questions_are_simple(builder, input: Dictionary) -> void:
 		builder.wolf_chat_context(input, 0, {}),
 		builder.action_context(input, 0, "wolf_kill", {}),
 		builder.action_context(input, 1, "seer_check", {}),
-		builder.action_context(input, 3, "witch_act", {}),
+		builder.action_context(_witch_input(input), 3, "witch_act", {}),
 		builder.action_context(input, 4, "guard_protect", {}),
 		builder.action_context(input, 0, "sheriff_vote", {}),
 		builder.action_context(input, 0, "sheriff_speech_order", {}),
@@ -187,6 +193,18 @@ func _input() -> Dictionary:
 		"phase_label": "狼人行动",
 		"map_rule_text": "【标准村庄 6人局】\n身份配置：狼人2、预言家1、女巫1、守卫1、村民1。\n夜晚流程：狼人夜间共同选择袭击目标；预言家每夜查验一名玩家阵营；女巫可救人或毒人；守卫可守护一名玩家。\n白天流程：按座位顺序发言，发言结束后投票放逐一名玩家。\n胜利条件：狼人全部出局，好人胜利；所有好人全部出局，狼人胜利。",
 	}
+
+
+func _witch_input(input: Dictionary) -> Dictionary:
+	var result: Dictionary = input.duplicate(true)
+	var werewolf: Dictionary = result["werewolf"] as Dictionary
+	werewolf["phase"] = "witch_action"
+	werewolf["current_action"] = {"key": "witch_act", "actor_index": 3, "label": "用药"}
+	werewolf["night"] = {"wolf_target_index": 2}
+	werewolf["witch_antidote"] = true
+	werewolf["witch_poison"] = true
+	result["phase_label"] = "女巫行动"
+	return result
 
 
 func _player(id: String, name: String, role_key: String) -> Dictionary:

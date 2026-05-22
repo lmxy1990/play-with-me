@@ -106,12 +106,12 @@ func _check_count_specific_rules(catalog: Array) -> void:
 			_expect(rules.has(count), "%s missing rule text for %d players" % [map_name, count])
 			var text := String(rules.get(count, ""))
 			_expect(text.contains("%d人局" % count), "%s %d players rule title is not count-specific" % [map_name, count])
-			if count >= 6 and count <= 9:
+			if count == 6:
 				_expect(text.contains("所有好人全部出局"), "%s %d players wolf win text is not all-good-dead" % [map_name, count])
 				_expect(not text.contains("村民或神职全部出局"), "%s %d players still uses slaughter-side wording" % [map_name, count])
 				_expect(not text.contains("村民全部出局或神职全部出局"), "%s %d players still uses slaughter-side wording" % [map_name, count])
 				_expect(String(win_rules.get(count, "")) == "all_good_dead", "%s %d players win condition key is not all_good_dead" % [map_name, count])
-			elif count >= 10:
+			elif count > 6:
 				_expect(text.contains("村民全部出局或神职全部出局"), "%s %d players wolf win text is not slaughter-side" % [map_name, count])
 				_expect(String(win_rules.get(count, "")) == "slaughter_side", "%s %d players win condition key is not slaughter_side" % [map_name, count])
 

@@ -29,6 +29,8 @@ func _initialize() -> void:
 		return
 	if not _expect(not _has_active_toast(room), "top toast does not show just because the room rendered"):
 		return
+	if not _expect(_seat_cards_are_above_center(room), "seat avatars are above the center panel for clicks"):
+		return
 
 	room._show_system_progress_toast("系统发言测试", 0.05)
 	await process_frame
@@ -52,6 +54,19 @@ func _initialize() -> void:
 	if not _expect(not _has_active_toast(room), "system progress toast dismisses"):
 		return
 
+	room._center_speech_items.clear()
+	room._set_system_message("阿明 加入 2号位")
+	await process_frame
+	if not _expect(_has_active_toast(room), "room lifecycle message appears as a toast"):
+		return
+	var lifecycle_toast := room._system_progress_toast as PanelContainer
+	var lifecycle_label := lifecycle_toast.find_child("SystemProgressToastLabel", true, false) as Label
+	if not _expect(lifecycle_label != null and String(lifecycle_label.text) == "阿明 加入 2号位", "room lifecycle toast keeps the room message"):
+		return
+	if not _expect(room._center_speech_items.is_empty(), "room lifecycle message does not enter center speech panel"):
+		return
+	room._clear_system_progress_toast()
+
 	var first_text := _repeat_text("第一段玩家发言，用来填满中间展示面板。", 18)
 	var second_text := _repeat_text("第二段玩家发言，播放完上一段后空间不够时应该清空旧内容。", 18)
 	var first := {"speaker": "1号 玩家A", "text": first_text, "at": 1.0}
@@ -59,6 +74,11 @@ func _initialize() -> void:
 	room._show_center_speech_item(first, false)
 	await process_frame
 	if not _expect(room._center_speech_items.size() == 1, "first speech is shown in center panel"):
+		return
+	var first_entry := room.find_child("CenterSpeechEntry", true, false)
+	room._update_center_speech_progress(first, 0.25)
+	await process_frame
+	if not _expect(first_entry != null and first_entry == room.find_child("CenterSpeechEntry", true, false), "center speech progress refresh reuses the existing view"):
 		return
 	room._finish_center_speech_item(first)
 	room._show_center_speech_item(second, true, false, true)
@@ -76,12 +96,35 @@ func _initialize() -> void:
 	if not _expect(String((room._center_speech_items[0] as Dictionary).get("speaker", "")) == "主持人", "moderator speaker remains in center panel"):
 		return
 
+	room._clear_system_progress_toast()
+	room._clear_center_speech_display()
+	room._refresh_center_panel()
+	room._present_history_item({"speaker": "主持人", "text": "昨夜平安夜。", "at": 4.0})
+	await process_frame
+	if not _expect(not _has_active_toast(room), "moderator history does not create a toast"):
+		return
+	if not _expect(room._center_speech_items.size() == 1, "moderator history is shown in center panel"):
+		return
+	if not _expect(String((room._center_speech_items[0] as Dictionary).get("text", "")) == "昨夜平安夜。", "moderator history center text is kept"):
+		return
+
 	room.queue_free()
 	quit(0)
 
 
 func _has_active_toast(room: Control) -> bool:
 	return room._system_progress_toast != null and is_instance_valid(room._system_progress_toast)
+
+
+func _seat_cards_are_above_center(room: Control) -> bool:
+	if room._center_panel == null or room._seat_cards.is_empty():
+		return false
+	for seat in room._seat_cards:
+		if not (seat is Control):
+			return false
+		if int((seat as Control).z_index) <= int(room._center_panel.z_index):
+			return false
+	return true
 
 
 func _repeat_text(text: String, count: int) -> String:

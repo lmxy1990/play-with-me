@@ -8,9 +8,15 @@ func _initialize() -> void:
 	_check_sheriff_speech_order(engine)
 	_check_sheriff_badge_action(engine)
 	_check_multi_wolf_target_vote(engine)
+	_check_witch_auto_skip_and_action_rules(engine)
 	_check_dead_player_post_game_summary(engine)
 	_check_post_game_summary_to_mvp_completion(engine)
 	_check_win_conditions(engine)
+	_check_wolf_attack_only_records_target_before_night_resolution(engine)
+	_check_attacked_seer_can_still_act_before_night_resolution(engine)
+	_check_night_attack_on_hunter_uses_night_end_death_flow(engine)
+	_check_vote_exiled_hunter_shoots_before_exile_settlement(engine)
+	_check_vote_exiled_hunter_can_skip_before_exile_settlement(engine)
 	_check_idiot_reveal_vote_flow(engine)
 	quit()
 
@@ -192,6 +198,73 @@ func _check_multi_wolf_target_vote(engine) -> void:
 	assert(String((state.get("current_action", {}) as Dictionary).get("key", "")) == "guard_protect")
 	var history: Array = second.get("history", [])
 	assert(history.any(func(item): return item is Dictionary and String((item as Dictionary).get("speaker", "")) == "主持人" and String((item as Dictionary).get("visibility", "")) == "wolf" and String((item as Dictionary).get("text", "")).contains("平票")))
+
+
+func _check_witch_auto_skip_and_action_rules(engine) -> void:
+	var players := [
+		_role_player("witch", true),
+		_role_player("wolf", true),
+		_role_player("villager", true),
+		_role_player("seer", true),
+	]
+	var no_potions := _witch_state(false, false, -1)
+	var no_potions_step: Dictionary = engine.skip_current_action(no_potions, players, 0)
+	assert(not bool(no_potions_step.get("ok", false)))
+	no_potions = _prepare_witch_phase(engine, no_potions, players)
+	assert((no_potions.get("current_action", {}) as Dictionary).is_empty())
+
+	var antidote_no_target := _prepare_witch_phase(engine, _witch_state(true, false, -1), players)
+	assert((antidote_no_target.get("current_action", {}) as Dictionary).is_empty())
+
+	var poison_only := _prepare_witch_phase(engine, _witch_state(false, true, -1), players)
+	assert(String((poison_only.get("current_action", {}) as Dictionary).get("key", "")) == "witch_act")
+	assert(int(engine.suggested_target_for_current_action(poison_only, players)) == 1)
+	var poison_result: Dictionary = engine.apply_target(poison_only, players, 1, 0)
+	assert(bool(poison_result.get("ok", false)))
+	assert(not bool((poison_result["players"] as Array)[1].get("alive", true)))
+
+	var both_potions_no_target := _prepare_witch_phase(engine, _witch_state(true, true, -1), players)
+	assert(String((both_potions_no_target.get("current_action", {}) as Dictionary).get("key", "")) == "witch_act")
+	assert(int(engine.suggested_target_for_current_action(both_potions_no_target, players)) == 1)
+
+	var save_only := _prepare_witch_phase(engine, _witch_state(true, false, 2), players)
+	assert(String((save_only.get("current_action", {}) as Dictionary).get("key", "")) == "witch_act")
+	assert(int(engine.suggested_target_for_current_action(save_only, players)) == 2)
+	var save_result: Dictionary = engine.apply_target(save_only, players, 2, 0)
+	assert(bool(save_result.get("ok", false)))
+	assert(bool((save_result["players"] as Array)[2].get("alive", false)))
+
+	var day_state := _witch_state(true, true, 2)
+	day_state["phase"] = "day_discussion"
+	day_state["current_action"] = {"key": "witch_act", "actor_index": 0, "label": "用药", "effect": "potion"}
+	var day_witch: Dictionary = engine.apply_target(day_state, players, 2, 0)
+	assert(not bool(day_witch.get("ok", false)))
+	var day_skip: Dictionary = engine.skip_current_action(day_state, players, 0)
+	assert(not bool(day_skip.get("ok", false)))
+
+
+func _prepare_witch_phase(engine, state: Dictionary, players: Array) -> Dictionary:
+	var result: Dictionary = engine.apply_target(state, players, 1, 3)
+	if not bool(result.get("ok", false)):
+		return {}
+	return result.get("werewolf", {}) as Dictionary
+
+
+func _witch_state(antidote: bool, poison: bool, wolf_target: int) -> Dictionary:
+	return {
+		"phase": "seer_action",
+		"day": 1,
+		"votes": {},
+		"night": {"day": 1, "wolf_target_index": wolf_target},
+		"current_action": {"key": "seer_check", "actor_index": 3, "label": "查验", "effect": "inspect"},
+		"speech_index": -1,
+		"spoken_indices": [],
+		"last_guarded_index": -1,
+		"witch_antidote": antidote,
+		"witch_poison": poison,
+		"sheriff_player_index": -1,
+		"post_game": {"stage": ""},
+	}
 
 
 func _check_sheriff_speech_order(engine) -> void:
@@ -436,6 +509,209 @@ func _check_win_conditions(engine) -> void:
 	assert(String(good_win.get("winner", "")) == "good")
 
 
+func _check_wolf_attack_only_records_target_before_night_resolution(engine) -> void:
+	var players := [
+		_role_player("wolf", true),
+		_role_player("hunter", true),
+		_role_player("guard", true),
+		_role_player("seer", true),
+	]
+	var state := {
+		"phase": "wolf_action",
+		"day": 1,
+		"map_id": "basic_village",
+		"wolf_win_condition": "all_good_dead",
+		"votes": {},
+		"night": {"day": 1, "wolf_target_index": -1},
+		"current_action": {"key": "wolf_kill", "actor_index": 0, "label": "投刀", "effect": "vote"},
+		"spoken_indices": [],
+		"last_guarded_index": -1,
+		"witch_antidote": false,
+		"witch_poison": false,
+		"sheriff_player_index": -1,
+		"post_game": {"stage": ""},
+	}
+	var result: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(bool(result.get("ok", false)))
+	state = result["werewolf"]
+	players = result["players"]
+	assert(String(state.get("phase", "")) == "guard_action")
+	assert(bool((players[1] as Dictionary).get("alive", false)))
+	assert(int(((state.get("night", {}) as Dictionary).get("wolf_target_index", -1))) == 1)
+	assert((result.get("death_indices", []) as Array).is_empty())
+
+
+func _check_attacked_seer_can_still_act_before_night_resolution(engine) -> void:
+	var players := [
+		_role_player("wolf", true),
+		_role_player("seer", true),
+		_role_player("villager", true),
+	]
+	var state := {
+		"phase": "wolf_action",
+		"day": 1,
+		"map_id": "quick_no_witch_village",
+		"wolf_win_condition": "all_good_dead",
+		"votes": {},
+		"night": {"day": 1, "wolf_target_index": -1},
+		"current_action": {"key": "wolf_kill", "actor_index": 0, "label": "投刀", "effect": "vote"},
+		"spoken_indices": [],
+		"last_guarded_index": -1,
+		"witch_antidote": false,
+		"witch_poison": false,
+		"sheriff_player_index": -1,
+		"post_game": {"stage": ""},
+	}
+	var attack_result: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(bool(attack_result.get("ok", false)))
+	state = attack_result["werewolf"]
+	players = attack_result["players"]
+	assert(String(state.get("phase", "")) == "seer_action")
+	assert(bool((players[1] as Dictionary).get("alive", false)))
+	assert(String((state.get("current_action", {}) as Dictionary).get("key", "")) == "seer_check")
+
+	var seer_result: Dictionary = engine.apply_target(state, players, 0, 0)
+	assert(bool(seer_result.get("ok", false)))
+	state = seer_result["werewolf"]
+	players = seer_result["players"]
+	assert(not bool((players[1] as Dictionary).get("alive", true)))
+	assert(String((players[1] as Dictionary).get("death_reason", "")) == "wolf")
+
+
+func _check_night_attack_on_hunter_uses_night_end_death_flow(engine) -> void:
+	var players := [
+		_role_player("wolf", true),
+		_role_player("hunter", true),
+		_role_player("villager", true),
+	]
+	var state := {
+		"phase": "wolf_action",
+		"day": 4,
+		"map_id": "quick_no_witch_village",
+		"wolf_win_condition": "all_good_dead",
+		"votes": {},
+		"night": {"day": 4, "wolf_target_index": -1},
+		"current_action": {"key": "wolf_kill", "actor_index": 0, "label": "投刀", "effect": "vote"},
+		"spoken_indices": [],
+		"last_guarded_index": -1,
+		"witch_antidote": false,
+		"witch_poison": false,
+		"sheriff_player_index": -1,
+		"post_game": {"stage": ""},
+	}
+	var night_result: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(bool(night_result.get("ok", false)))
+	state = night_result["werewolf"]
+	players = night_result["players"]
+	assert(String(state.get("phase", "")) == "hunter_action")
+	assert(bool((players[1] as Dictionary).get("alive", false)))
+	assert(bool((players[1] as Dictionary).get("can_hunter_shoot", false)))
+	assert(String((state.get("current_action", {}) as Dictionary).get("key", "")) == "hunter_shoot")
+	assert(String(state.get("winner", "")) == "")
+
+	var shot_result: Dictionary = engine.apply_target(state, players, 0, 0)
+	assert(bool(shot_result.get("ok", false)))
+	state = shot_result["werewolf"]
+	players = shot_result["players"]
+	assert(not bool((players[0] as Dictionary).get("alive", true)))
+	assert(String(state.get("winner", "")) == "good")
+
+
+func _check_vote_exiled_hunter_shoots_before_exile_settlement(engine) -> void:
+	var players := [
+		_role_player("wolf", true),
+		_role_player("hunter", true),
+		_role_player("villager", true),
+	]
+	var state := {
+		"phase": "vote",
+		"day": 2,
+		"map_id": "quick_no_witch_village",
+		"wolf_win_condition": "all_good_dead",
+		"votes": {},
+		"night": {},
+		"current_action": {"key": "vote", "actor_index": 0, "label": "投票", "effect": "vote"},
+		"spoken_indices": [],
+		"last_guarded_index": -1,
+		"witch_antidote": false,
+		"witch_poison": false,
+		"sheriff_player_index": -1,
+		"post_game": {"stage": ""},
+	}
+	var first: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(bool(first.get("ok", false)))
+	state = first["werewolf"]
+	players = first["players"]
+	var second: Dictionary = engine.apply_target(state, players, 0, 0)
+	assert(bool(second.get("ok", false)))
+	state = second["werewolf"]
+	players = second["players"]
+	var third: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(bool(third.get("ok", false)))
+	state = third["werewolf"]
+	players = third["players"]
+	assert(String(state.get("phase", "")) == "hunter_action")
+	assert(bool((players[1] as Dictionary).get("alive", false)))
+	assert(bool((players[1] as Dictionary).get("can_hunter_shoot", false)))
+	assert(int(state.get("pending_vote_exile_index", -1)) == 1)
+	assert(String(state.get("winner", "")) == "")
+
+	var shot: Dictionary = engine.apply_target(state, players, 0, 0)
+	assert(bool(shot.get("ok", false)))
+	state = shot["werewolf"]
+	players = shot["players"]
+	assert(not bool((players[0] as Dictionary).get("alive", true)))
+	assert(bool((players[1] as Dictionary).get("alive", false)))
+	assert(String((players[1] as Dictionary).get("death_reason", "")) == "")
+	assert(String(state.get("winner", "")) == "good")
+
+
+func _check_vote_exiled_hunter_can_skip_before_exile_settlement(engine) -> void:
+	var players := [
+		_role_player("wolf", true),
+		_role_player("hunter", true),
+		_role_player("wolf", true),
+	]
+	var state := {
+		"phase": "vote",
+		"day": 2,
+		"map_id": "quick_no_witch_village",
+		"wolf_win_condition": "all_good_dead",
+		"votes": {},
+		"night": {},
+		"current_action": {"key": "vote", "actor_index": 0, "label": "投票", "effect": "vote"},
+		"spoken_indices": [],
+		"last_guarded_index": -1,
+		"witch_antidote": false,
+		"witch_poison": false,
+		"sheriff_player_index": -1,
+		"post_game": {"stage": ""},
+	}
+	var first: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(bool(first.get("ok", false)))
+	state = first["werewolf"]
+	players = first["players"]
+	var second: Dictionary = engine.apply_target(state, players, 0, 0)
+	assert(bool(second.get("ok", false)))
+	state = second["werewolf"]
+	players = second["players"]
+	var third: Dictionary = engine.apply_target(state, players, 1, 0)
+	assert(bool(third.get("ok", false)))
+	state = third["werewolf"]
+	players = third["players"]
+	assert(String(state.get("phase", "")) == "hunter_action")
+	assert(bool((players[1] as Dictionary).get("alive", false)))
+	assert(int(state.get("pending_vote_exile_index", -1)) == 1)
+
+	var skip: Dictionary = engine.skip_current_action(state, players, 0)
+	assert(bool(skip.get("ok", false)))
+	state = skip["werewolf"]
+	players = skip["players"]
+	assert(not bool((players[1] as Dictionary).get("alive", true)))
+	assert(String((players[1] as Dictionary).get("death_reason", "")) == "exiled")
+	assert(String(state.get("winner", "")) == "wolf")
+
+
 func _check_idiot_reveal_vote_flow(engine) -> void:
 	var players := [
 		_role_player("idiot", true),
@@ -467,6 +743,7 @@ func _check_idiot_reveal_vote_flow(engine) -> void:
 	players = third["players"]
 	assert(bool((players[0] as Dictionary).get("alive", false)))
 	assert(bool((players[0] as Dictionary).get("idiot_revealed", false)))
+	assert(String((players[0] as Dictionary).get("idiot_reveal_source", "")) == "vote_exile")
 	assert(String(state.get("phase", "")) == "wolf_chat")
 	assert(int(state.get("day", 0)) == 2)
 

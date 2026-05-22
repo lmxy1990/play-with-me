@@ -9,14 +9,25 @@ func _initialize() -> void:
 
 
 func _check_sheriff_square(catalog) -> void:
-	_expect_array(catalog.get_supported_player_counts("sheriff_square"), [10, 12], "sheriff_square counts")
+	var counts := [7, 8, 9, 10, 11, 12]
+	_expect_array(catalog.get_supported_player_counts("sheriff_square"), counts, "sheriff_square counts")
+	for count in counts:
+		_expect(catalog.get_role_config("sheriff_square", count).size() == count, "sheriff_square %d role count mismatch" % count)
+		_expect(catalog.wolf_win_condition_key("sheriff_square", count) == "slaughter_side", "sheriff_square %d win condition" % count)
+		_expect(catalog.rule_text("sheriff_square", count).contains("%d人局" % count), "sheriff_square %d rule text missing count" % count)
+		_expect(catalog.rule_text("sheriff_square", count).contains("警长流程"), "sheriff_square %d rule text missing sheriff flow" % count)
+	_expect_roles(catalog.get_role_config("sheriff_square", 7), {
+		"wolf": 2,
+		"seer": 1,
+		"witch": 1,
+		"villager": 3,
+	}, "sheriff_square 7 roles")
 	_expect_roles(catalog.get_role_config("sheriff_square", 10), {
 		"wolf": 3,
 		"seer": 1,
 		"witch": 1,
 		"hunter": 1,
-		"idiot": 1,
-		"villager": 3,
+		"villager": 4,
 	}, "sheriff_square 10 roles")
 	_expect_roles(catalog.get_role_config("sheriff_square", 12), {
 		"wolf": 4,
@@ -26,12 +37,30 @@ func _check_sheriff_square(catalog) -> void:
 		"idiot": 1,
 		"villager": 4,
 	}, "sheriff_square 12 roles")
-	_expect(catalog.wolf_win_condition_key("sheriff_square", 10) == "slaughter_side", "sheriff_square 10 win condition")
-	_expect(catalog.wolf_win_condition_key("sheriff_square", 12) == "slaughter_side", "sheriff_square 12 win condition")
 
 
 func _check_sheriff_guard_square(catalog) -> void:
-	_expect_array(catalog.get_supported_player_counts("sheriff_guard_square"), [12], "sheriff_guard_square counts")
+	var counts := [7, 8, 9, 10, 11, 12]
+	_expect_array(catalog.get_supported_player_counts("sheriff_guard_square"), counts, "sheriff_guard_square counts")
+	for count in counts:
+		_expect(catalog.get_role_config("sheriff_guard_square", count).size() == count, "sheriff_guard_square %d role count mismatch" % count)
+		_expect(catalog.wolf_win_condition_key("sheriff_guard_square", count) == "slaughter_side", "sheriff_guard_square %d win condition" % count)
+		_expect(catalog.rule_text("sheriff_guard_square", count).contains("%d人局" % count), "sheriff_guard_square %d rule text missing count" % count)
+		_expect(catalog.rule_text("sheriff_guard_square", count).contains("警长流程"), "sheriff_guard_square %d rule text missing sheriff flow" % count)
+		_expect(catalog.rule_text("sheriff_guard_square", count).contains("守卫每夜守护"), "sheriff_guard_square %d rule text missing guard flow" % count)
+	_expect_roles(catalog.get_role_config("sheriff_guard_square", 7), {
+		"wolf": 2,
+		"seer": 1,
+		"guard": 1,
+		"villager": 3,
+	}, "sheriff_guard_square 7 roles")
+	_expect_roles(catalog.get_role_config("sheriff_guard_square", 10), {
+		"wolf": 3,
+		"seer": 1,
+		"witch": 1,
+		"guard": 1,
+		"villager": 4,
+	}, "sheriff_guard_square 10 roles")
 	_expect_roles(catalog.get_role_config("sheriff_guard_square", 12), {
 		"wolf": 4,
 		"seer": 1,
@@ -40,7 +69,6 @@ func _check_sheriff_guard_square(catalog) -> void:
 		"guard": 1,
 		"villager": 4,
 	}, "sheriff_guard_square 12 roles")
-	_expect(catalog.wolf_win_condition_key("sheriff_guard_square", 12) == "slaughter_side", "sheriff_guard_square 12 win condition")
 
 
 func _expect_roles(roles: Array, expected: Dictionary, label: String) -> void:

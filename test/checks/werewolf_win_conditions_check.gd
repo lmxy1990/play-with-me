@@ -5,11 +5,18 @@ const WinConditionsScript := preload("res://scripts/room/werewolf/werewolf_win_c
 
 func _initialize() -> void:
 	var rules = WinConditionsScript.new()
+	_check_default_condition(rules)
 	_check_all_good_dead(rules)
 	_check_slaughter_side(rules)
 	_check_wolf_team_variants(rules)
 	_check_third_party_rules(rules)
 	quit()
+
+
+func _check_default_condition(rules) -> void:
+	assert(rules.default_wolf_condition_key(6) == "all_good_dead")
+	assert(rules.default_wolf_condition_key(7) == "slaughter_side")
+	assert(rules.default_wolf_condition_key(12) == "slaughter_side")
 
 
 func _check_all_good_dead(rules) -> void:

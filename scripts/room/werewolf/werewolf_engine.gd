@@ -36,6 +36,8 @@ func default_state() -> Dictionary:
 		"last_words_used": [],
 		"last_words_return_phase": "",
 		"hunter_return_phase": "",
+		"pending_night_deaths": [],
+		"pending_vote_exile_index": -1,
 		"sheriff_badge_return_phase": "",
 		"sheriff_badge_dead_index": -1,
 		"sheriff_badge_candidates": [],
@@ -467,6 +469,8 @@ func skip_current_action(state: Dictionary, players: Array, local_index: int = -
 		return _error("当前没有可跳过的行动")
 	var actor_index: int = int(action.get("actor_index", -1))
 	var action_key: String = String(action.get("key", ""))
+	if action_key == "witch_act" and String(next_state.get("phase", "")) != "witch_action":
+		return _error("女巫只能在夜晚行动")
 	if not _can_skip_action(action_key):
 		return _error("当前行动不能跳过")
 	var history: Array = []
@@ -642,7 +646,7 @@ func _prepare_prompt(state: Dictionary, players: Array, local_index: int) -> voi
 				_set_action(state, players, seer, "seer_check", "查验", ACTION_INSPECT, "inspect")
 		"witch_action":
 			var witch: int = _first_alive_role(players, "witch")
-			if witch >= 0:
+			if witch >= 0 and not _should_auto_skip_witch(state, players):
 				_set_action(state, players, witch, "witch_act", "用药", ACTION_POTION, "potion")
 		"last_words":
 			var pending: Array = _as_array(state.get("last_words_pending", []))
@@ -781,8 +785,6 @@ func _advance_auto(state: Dictionary, players: Array) -> Dictionary:
 			next_state["phase"] = "witch_action"
 			continue
 		if phase == "witch_action" and (not _has_alive_role(next_players, "witch") or _should_auto_skip_witch(next_state, next_players)):
-			if _has_alive_role(next_players, "witch"):
-				history.append(_history("主持人", "女巫已无可用药水，自动跳过。"))
 			var resolved: Dictionary = _resolve_night(next_state, next_players)
 			next_state = resolved["werewolf"]
 			next_players = resolved["players"]
@@ -820,54 +822,41 @@ func _apply_witch_action(state: Dictionary, players: Array, actor_index: int, ta
 func _resolve_night(state: Dictionary, players: Array) -> Dictionary:
 	var next_state: Dictionary = state.duplicate(true)
 	var night: Dictionary = _as_dict(next_state.get("night", {}))
-	var deaths: Array = []
+	var raw_deaths: Array = []
 	var wolf_target: int = int(night.get("wolf_target_index", -1))
 	var guarded: int = int(night.get("guarded_index", -1))
 	var poison_target: int = int(night.get("witch_poison_target_index", -1))
 	if wolf_target >= 0 and wolf_target != guarded and not bool(night.get("witch_saved", false)):
-		deaths.append(wolf_target)
+		raw_deaths.append(wolf_target)
 	if poison_target >= 0:
-		deaths.append(poison_target)
-	deaths = _unique_indices(deaths)
+		raw_deaths.append(poison_target)
+	var deaths: Array = _unique_indices(raw_deaths)
+	var pending_deaths: Array = []
 	for item in deaths:
 		var index: int = int(item)
 		var reason := "女巫毒杀" if index == poison_target else "夜晚死亡"
 		var death_key := "witch_poison" if index == poison_target else "wolf"
-		_kill_player(players, index, reason, death_key)
+		pending_deaths.append({"index": index, "reason": reason, "death_reason": death_key})
 
 	var history: Array = []
-	var death_names: Array = []
-	for item in deaths:
-		death_names.append(_player_title(players, int(item)))
-	var message := "昨夜平安夜。"
-	if not death_names.is_empty():
-		message = "昨夜死亡：%s。" % "、".join(death_names)
-	history.append(_history("主持人", message))
 	next_state["night"] = {}
 	next_state["spoken_indices"] = []
-
-	var win: Dictionary = _check_win(next_state, players)
-	if String(win.get("winner", "")) != "":
-		next_state = _finish_game(next_state, players, String(win["winner"]))
-		history.append(_history("主持人", String(win["message"])))
-		return _transition_result(players, next_state, history, deaths, String(win["message"]))
-
-	var badge: Dictionary = _start_sheriff_badge_action_if_needed(next_state, players, deaths, "day_entry", true)
-	if bool(badge.get("started", false)):
-		next_state = badge["werewolf"]
-		history.append_array(badge["history"])
-		return _transition_result(players, next_state, history, deaths, String(badge.get("message", message)))
-
-	if _first_hunter_can_shoot(players) >= 0:
+	if _grant_hunter_shot_for_pending_deaths(players, pending_deaths):
+		next_state["pending_night_deaths"] = pending_deaths
+		var pending_names: Array = []
+		for item in pending_deaths:
+			var entry: Dictionary = item
+			pending_names.append(_player_title(players, int(entry.get("index", -1))))
+		history.append(_history("主持人", "夜晚结算结果指向：%s，先处理出局前技能。" % "、".join(pending_names)))
 		next_state["phase"] = "hunter_action"
-		next_state["hunter_return_phase"] = "day_entry"
-		return _transition_result(players, next_state, history, deaths, message)
+		next_state["hunter_return_phase"] = "night_death_settlement"
+		return _transition_result(players, next_state, history, [], "猎人可开枪")
 
-	var last_words: Dictionary = _start_last_words_if_needed(next_state, players, deaths, "day_entry")
-	next_state = last_words["werewolf"]
-	history.append_array(last_words["history"])
-	message = String(last_words.get("message", message))
-	return _transition_result(players, next_state, history, deaths, message)
+	var settled: Dictionary = _settle_night_deaths(next_state, players, pending_deaths)
+	next_state = settled["werewolf"]
+	players = settled["players"]
+	history.append_array(settled["history"])
+	return _transition_result(players, next_state, history, settled["death_indices"], String(settled.get("message", "天亮了")))
 
 
 func _resolve_sheriff_vote(state: Dictionary, players: Array) -> Dictionary:
@@ -950,32 +939,20 @@ func _resolve_vote(state: Dictionary, players: Array) -> Dictionary:
 		history.append(_history("主持人", "第%d夜开始。" % int(state.get("day", 1))))
 		return _transition_result(players, state, history, deaths, "白痴翻牌免死，进入夜晚")
 
-	_kill_player(players, exiled_index, "放逐", "exiled")
-	deaths.append(exiled_index)
-	history.append(_history("主持人", "%s被投票放逐。" % _player_title(players, exiled_index)))
-	var win: Dictionary = _check_win(state, players)
-	if String(win.get("winner", "")) != "":
-		state = _finish_game(state, players, String(win["winner"]))
-		history.append(_history("主持人", String(win["message"])))
-		return _transition_result(players, state, history, deaths, String(win["message"]))
-
-	var badge: Dictionary = _start_sheriff_badge_action_if_needed(state, players, [exiled_index], "win_check", true)
-	if bool(badge.get("started", false)):
-		state = badge["werewolf"]
-		history.append_array(badge["history"])
-		message = String(badge.get("message", "警徽处理"))
-		return _transition_result(players, state, history, deaths, message)
-
-	if String(players[exiled_index].get("role_key", "")) == "hunter" and bool(players[exiled_index].get("can_hunter_shoot", false)):
+	state["pending_vote_exile_index"] = exiled_index
+	if _grant_hunter_shot_on_pending_exile(players, exiled_index):
+		history.append(_history("主持人", "投票结果指向：%s，先处理出局前技能。" % _player_title(players, exiled_index)))
 		state["phase"] = "hunter_action"
-		state["hunter_return_phase"] = "win_check"
+		state["hunter_return_phase"] = "vote_exile_settlement"
 		message = "猎人可开枪"
 		return _transition_result(players, state, history, deaths, message)
 
-	var last_words: Dictionary = _start_last_words_if_needed(state, players, [exiled_index], "win_check")
-	state = last_words["werewolf"]
-	history.append_array(last_words["history"])
-	message = String(last_words.get("message", "投票完成"))
+	var settled: Dictionary = _settle_pending_vote_exile(state, players)
+	state = settled["werewolf"]
+	players = settled["players"]
+	deaths.append_array(settled["death_indices"])
+	history.append_array(settled["history"])
+	message = String(settled.get("message", "投票完成"))
 	return _transition_result(players, state, history, deaths, message)
 
 
@@ -986,9 +963,27 @@ func _after_hunter_action(state: Dictionary, players: Array) -> Dictionary:
 	state["hunter_return_phase"] = ""
 	var win: Dictionary = _check_win(state, players)
 	if String(win.get("winner", "")) != "":
+		state["pending_night_deaths"] = []
+		state["pending_vote_exile_index"] = -1
 		state = _finish_game(state, players, String(win["winner"]))
 		history.append(_history("主持人", String(win["message"])))
 		return _transition_result(players, state, history, deaths, String(win["message"]))
+	if return_phase == "night_death_settlement":
+		var pending: Array = _as_array(state.get("pending_night_deaths", []))
+		state["pending_night_deaths"] = []
+		var night_settled: Dictionary = _settle_night_deaths(state, players, pending)
+		state = night_settled["werewolf"]
+		players = night_settled["players"]
+		history.append_array(night_settled["history"])
+		deaths.append_array(night_settled["death_indices"])
+		return _transition_result(players, state, history, deaths, String(night_settled.get("message", "猎人行动完成")))
+	if return_phase == "vote_exile_settlement":
+		var settled: Dictionary = _settle_pending_vote_exile(state, players)
+		state = settled["werewolf"]
+		players = settled["players"]
+		history.append_array(settled["history"])
+		deaths.append_array(settled["death_indices"])
+		return _transition_result(players, state, history, deaths, String(settled.get("message", "猎人行动完成")))
 	var candidates: Array = _pending_last_words_candidates(state, players)
 	var badge: Dictionary = _start_sheriff_badge_action_if_needed(state, players, candidates, return_phase, false)
 	if bool(badge.get("started", false)):
@@ -999,6 +994,77 @@ func _after_hunter_action(state: Dictionary, players: Array) -> Dictionary:
 	state = last_words["werewolf"]
 	history.append_array(last_words["history"])
 	return _transition_result(players, state, history, deaths, String(last_words.get("message", "猎人行动完成")))
+
+
+func _settle_night_deaths(state: Dictionary, players: Array, pending_deaths: Array) -> Dictionary:
+	var history: Array = []
+	var deaths: Array = []
+	for item in pending_deaths:
+		if not (item is Dictionary):
+			continue
+		var entry: Dictionary = item
+		var index := int(entry.get("index", -1))
+		if not _is_alive_occupied(players, index):
+			continue
+		_kill_player(players, index, String(entry.get("reason", "夜晚死亡")), String(entry.get("death_reason", "wolf")))
+		deaths.append(index)
+	state["pending_night_deaths"] = []
+
+	var death_names: Array = []
+	for item in deaths:
+		death_names.append(_player_title(players, int(item)))
+	var message := "昨夜平安夜。"
+	if not death_names.is_empty():
+		message = "昨夜死亡：%s。" % "、".join(death_names)
+	history.append(_history("主持人", message))
+
+	var win: Dictionary = _check_win(state, players)
+	if String(win.get("winner", "")) != "":
+		state = _finish_game(state, players, String(win["winner"]))
+		history.append(_history("主持人", String(win["message"])))
+		return _transition_result(players, state, history, deaths, String(win["message"]))
+
+	var candidates: Array = _pending_last_words_candidates(state, players)
+	var badge: Dictionary = _start_sheriff_badge_action_if_needed(state, players, candidates, "day_entry", false)
+	if bool(badge.get("started", false)):
+		state = badge["werewolf"]
+		history.append_array(badge["history"])
+		return _transition_result(players, state, history, deaths, String(badge.get("message", message)))
+
+	var last_words: Dictionary = _start_last_words_if_needed(state, players, candidates, "day_entry")
+	state = last_words["werewolf"]
+	history.append_array(last_words["history"])
+	message = String(last_words.get("message", message))
+	return _transition_result(players, state, history, deaths, message)
+
+
+func _settle_pending_vote_exile(state: Dictionary, players: Array) -> Dictionary:
+	var exiled_index := int(state.get("pending_vote_exile_index", -1))
+	state["pending_vote_exile_index"] = -1
+	if not _is_alive_occupied(players, exiled_index):
+		return _transition_result(players, state, [], [], "投票完成")
+
+	_kill_player(players, exiled_index, "放逐", "exiled")
+	var history := [_history("主持人", "%s被投票放逐。" % _player_title(players, exiled_index))]
+	var deaths := [exiled_index]
+
+	var win: Dictionary = _check_win(state, players)
+	if String(win.get("winner", "")) != "":
+		state = _finish_game(state, players, String(win["winner"]))
+		history.append(_history("主持人", String(win["message"])))
+		return _transition_result(players, state, history, deaths, String(win["message"]))
+
+	var candidates: Array = _pending_last_words_candidates(state, players)
+	var badge: Dictionary = _start_sheriff_badge_action_if_needed(state, players, candidates, "win_check", false)
+	if bool(badge.get("started", false)):
+		state = badge["werewolf"]
+		history.append_array(badge["history"])
+		return _transition_result(players, state, history, deaths, String(badge.get("message", "警徽处理")))
+
+	var last_words: Dictionary = _start_last_words_if_needed(state, players, candidates, "win_check")
+	state = last_words["werewolf"]
+	history.append_array(last_words["history"])
+	return _transition_result(players, state, history, deaths, String(last_words.get("message", "投票完成")))
 
 
 func _start_sheriff_badge_action_if_needed(state: Dictionary, players: Array, candidates: Array, return_phase: String, check_hunter_after_badge: bool) -> Dictionary:
@@ -1313,6 +1379,8 @@ func _validate_target(state: Dictionary, players: Array, actor_index: int, targe
 			if target_index == actor_index:
 				return _error("不能选择自己")
 		"witch_act":
+			if String(state.get("phase", "")) != "witch_action":
+				return _error("女巫只能在夜晚行动")
 			var night: Dictionary = _as_dict(state.get("night", {}))
 			var wolf_target: int = int(night.get("wolf_target_index", -1))
 			if target_index == wolf_target and bool(state.get("witch_antidote", true)):
@@ -1341,6 +1409,28 @@ func _kill_player(players: Array, index: int, reason: String, death_reason: Stri
 	players[index] = player
 
 
+func _grant_hunter_shot_on_pending_exile(players: Array, index: int) -> bool:
+	if not _is_alive_occupied(players, index):
+		return false
+	var player: Dictionary = players[index]
+	if String(player.get("role_key", "")) != "hunter" or bool(player.get("has_hunter_shot", false)):
+		return false
+	player["can_hunter_shoot"] = true
+	players[index] = player
+	return true
+
+
+func _grant_hunter_shot_for_pending_deaths(players: Array, pending_deaths: Array) -> bool:
+	var granted := false
+	for item in pending_deaths:
+		if not (item is Dictionary):
+			continue
+		var entry: Dictionary = item
+		if _grant_hunter_shot_on_pending_exile(players, int(entry.get("index", -1))):
+			granted = true
+	return granted
+
+
 func _can_idiot_reveal(players: Array, index: int) -> bool:
 	if index < 0 or index >= players.size() or not (players[index] is Dictionary):
 		return false
@@ -1351,6 +1441,7 @@ func _can_idiot_reveal(players: Array, index: int) -> bool:
 func _reveal_idiot(players: Array, index: int) -> void:
 	var player: Dictionary = players[index]
 	player["idiot_revealed"] = true
+	player["idiot_reveal_source"] = "vote_exile"
 	player["state"] = "白痴翻牌"
 	player["motion"] = SeatMotion.IDLE
 	players[index] = player
@@ -1423,11 +1514,15 @@ func _witch_prompt_message(state: Dictionary, players: Array, actor_index: int) 
 	var actor := _player_title(players, actor_index)
 	var night: Dictionary = _as_dict(state.get("night", {}))
 	var wolf_target: int = int(night.get("wolf_target_index", -1))
-	if wolf_target >= 0 and bool(state.get("witch_antidote", true)):
-		return "私密询问：%s，今晚 %s 被袭击。请选择救人、毒人或不用药；若用毒，请选择目标。" % [actor, _player_title(players, wolf_target)]
-	if bool(state.get("witch_poison", true)):
-		return "私密询问：%s，今晚没有可救目标。请选择是否使用毒药；若用毒，请选择目标。" % actor
-	return "私密询问：%s，今晚没有可用药水。" % actor
+	var can_save := wolf_target >= 0 and bool(state.get("witch_antidote", true)) and _is_alive_occupied(players, wolf_target)
+	var can_poison := bool(state.get("witch_poison", true)) and _has_alive_target_except(players, actor_index)
+	if can_save and can_poison:
+		return "女巫行动：%s，今晚 %s 被袭击。请选择使用解药、毒药或不用药；若用毒，请选择目标。" % [actor, _player_title(players, wolf_target)]
+	if can_save:
+		return "女巫行动：%s，今晚 %s 被袭击。是否使用解药？" % [actor, _player_title(players, wolf_target)]
+	if can_poison:
+		return "女巫行动：%s，今晚没有可救目标。是否使用毒药；若用毒，请选择目标。" % actor
+	return "女巫行动：%s，今晚没有可用药水。" % actor
 
 
 func _append_prompt_history(history: Array, state: Dictionary, players: Array) -> void:
@@ -1486,12 +1581,14 @@ func _new_night(day: int) -> Dictionary:
 
 
 func _should_auto_skip_witch(state: Dictionary, players: Array) -> bool:
+	if String(state.get("phase", "")) != "witch_action":
+		return true
 	var witch: int = _first_alive_role(players, "witch")
 	if witch < 0:
 		return false
 	var night: Dictionary = _as_dict(state.get("night", {}))
 	var wolf_target: int = int(night.get("wolf_target_index", -1))
-	var can_save: bool = wolf_target >= 0 and bool(state.get("witch_antidote", true))
+	var can_save: bool = wolf_target >= 0 and bool(state.get("witch_antidote", true)) and _is_alive_occupied(players, wolf_target)
 	var can_poison: bool = bool(state.get("witch_poison", true)) and _has_alive_target_except(players, witch)
 	return not can_save and not can_poison
 

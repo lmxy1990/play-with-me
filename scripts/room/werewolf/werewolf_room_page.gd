@@ -32,6 +32,11 @@ func _show_table() -> void:
 	table.clip_contents = false
 	_scene_root.add_child(table)
 
+	var center := _center_table_panel()
+	center.z_index = 0
+	table.add_child(center)
+	table.set_meta("center", center)
+
 	for i in range(_players.size()):
 		var seat := SeatCardScript.new()
 		seat.index = i
@@ -43,12 +48,10 @@ func _show_table() -> void:
 		seat.seat_pressed.connect(_on_seat_pressed)
 		seat.name_edit_pressed.connect(_on_seat_name_edit_pressed)
 		seat.voice_toggle_pressed.connect(_on_seat_voice_toggle_pressed)
+		seat.z_index = 10
 		table.add_child(seat)
 		_seat_cards.append(seat)
 
-	var center := _center_table_panel()
-	table.add_child(center)
-	table.set_meta("center", center)
 	table.set_meta("seats", _seat_cards)
 	table.resized.connect(_layout_table.bind(table))
 	call_deferred("_layout_table", table)

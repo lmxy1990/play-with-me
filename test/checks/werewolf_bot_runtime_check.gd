@@ -24,6 +24,8 @@ func _initialize() -> void:
 	_check_mvp_roles_and_decision(page)
 	_check_witch_skip_and_save(page)
 	_check_witch_poison_targets_exclude_save_target(page)
+	_check_witch_poison_only_context(page)
+	_check_witch_day_context_uses_public_night_result(page)
 	_check_hunter_shoot_schema_and_parser(page)
 	_check_wolf_action_records_private_vote(page)
 	_check_reasoning_output_warning_continues_game(page)
@@ -532,10 +534,11 @@ func _check_witch_skip_and_save(page) -> void:
 	var context: Dictionary = page._bot_action_context(0, "witch_act", {})
 	assert((context["allowed_actions"] as Array) == ["witch_act"])
 	var payload: Dictionary = page._bot_runtime.to_model_payload(context)
-	assert(String(payload.get("current_question", "")) == "选择救人、毒人或跳过。")
+	assert(String(payload.get("current_question", "")) == "选择是否解救。")
 	assert(not payload.has("privateInfo"))
 	assert(String(payload.get("current_state", "")).contains("今晚被袭击"))
 	assert(String(payload.get("current_state", "")).contains("解药：可用"))
+	assert(String(payload.get("current_state", "")).contains("毒药：已用"))
 	assert(payload.has("targetOptions"))
 	var targets: Array = page._bot_runtime.target_options_for_context(context)
 	assert(targets.size() == 1)
@@ -555,9 +558,10 @@ func _check_witch_skip_and_save(page) -> void:
 	var target_schema: Dictionary = properties["targetSeatNumber"] as Dictionary
 	assert(((properties["action"] as Dictionary).get("enum", []) as Array) == ["witch_act"])
 	assert(String((properties["action"] as Dictionary).get("description", "")) == "本次行动：女巫用药。固定值。")
-	assert(String(target_schema.get("description", "")) == "目标座位号。-1 表示不用药。")
+	assert(String(target_schema.get("description", "")) == "女巫用药选择。-1 表示不使用解药；今晚被袭击座位表示使用解药。")
 	assert((target_schema.get("enum", []) as Array).has(-1))
 	assert((target_schema.get("enum", []) as Array).has(2))
+	assert(not (target_schema.get("enum", []) as Array).has(3))
 	assert(not schema_body.has("anyOf"))
 	var save_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_act\",\"targetSeatNumber\":2}", context)
 	assert(bool(save_decision.get("ok", false)))
@@ -604,7 +608,7 @@ func _check_witch_poison_targets_exclude_save_target(page) -> void:
 	var properties: Dictionary = schema_body["properties"] as Dictionary
 	assert(((properties["action"] as Dictionary).get("enum", []) as Array) == ["witch_act"])
 	assert(String((properties["action"] as Dictionary).get("description", "")) == "本次行动：女巫用药。固定值。")
-	assert(String((properties["targetSeatNumber"] as Dictionary).get("description", "")) == "目标座位号。-1 表示不用药。")
+	assert(String((properties["targetSeatNumber"] as Dictionary).get("description", "")) == "女巫用药选择。-1 表示不用药；今晚被袭击座位表示使用解药；其它合法座位表示使用毒药。")
 	assert((properties["targetSeatNumber"] as Dictionary).has("enum"))
 	assert(((properties["targetSeatNumber"] as Dictionary).get("enum", []) as Array).has(-1))
 	assert(((properties["targetSeatNumber"] as Dictionary).get("enum", []) as Array).has(2))
@@ -621,6 +625,83 @@ func _check_witch_poison_targets_exclude_save_target(page) -> void:
 	assert(bool(save_real_target.get("ok", false)))
 	assert(String(save_real_target.get("action", "")) == "witch_save")
 	assert(int(save_real_target.get("target_index", -1)) == 1)
+
+
+func _check_witch_poison_only_context(page) -> void:
+	page._players = [
+		_player("player_1", "张安", "witch", true),
+		_player("player_2", "李宁", "wolf", true),
+		_player("player_3", "周舟", "villager", true),
+	]
+	page._werewolf = {
+		"phase": "witch_action",
+		"day": 1,
+		"map_name": "标准村庄",
+		"has_sheriff": false,
+		"votes": {},
+		"night": {"wolf_target_index": 2},
+		"current_action": {"key": "witch_act", "actor_index": 0, "label": "用药"},
+		"witch_antidote": false,
+		"witch_poison": true,
+		"last_guarded_index": -1,
+		"post_game": {"stage": ""},
+	}
+	var context: Dictionary = page._bot_action_context(0, "witch_act", {})
+	var payload: Dictionary = page._bot_runtime.to_model_payload(context)
+	assert(String(payload.get("current_question", "")) == "选择是否毒人。")
+	assert(not String(payload.get("current_state", "")).contains("今晚被袭击"))
+	assert(String(payload.get("current_state", "")).contains("解药：已用"))
+	assert(String(payload.get("current_state", "")).contains("毒药：可用"))
+	for player in payload["players"]:
+		assert(not (player as Dictionary).has("nightTargeted"))
+	var targets: Array = page._bot_runtime.target_options_for_context(context)
+	assert(targets.size() == 2)
+	assert(((targets[0] as Dictionary).get("targetActions", []) as Array).has("witch_poison"))
+	assert(((targets[1] as Dictionary).get("targetActions", []) as Array).has("witch_poison"))
+	assert((payload["targetOptions"] as Array).has(-1))
+	assert((payload["targetOptions"] as Array).has(2))
+	assert((payload["targetOptions"] as Array).has(3))
+	var response_schema: Dictionary = page._bot_runtime.response_schema_for_context(context)
+	var schema_body: Dictionary = response_schema["schema"] as Dictionary
+	var properties: Dictionary = schema_body["properties"] as Dictionary
+	assert(String((properties["targetSeatNumber"] as Dictionary).get("description", "")) == "女巫用药选择。-1 表示不使用毒药；其它合法座位表示使用毒药。")
+	var poison_decision: Dictionary = page._bot_runtime.parse_decision("{\"action\":\"witch_act\",\"targetSeatNumber\":2}", context)
+	assert(bool(poison_decision.get("ok", false)))
+	assert(String(poison_decision.get("action", "")) == "witch_poison")
+
+
+func _check_witch_day_context_uses_public_night_result(page) -> void:
+	page._players = [
+		_player("player_1", "张安", "witch", true),
+		_player("player_2", "李宁", "wolf", true),
+		_player("player_3", "周舟", "villager", true),
+	]
+	page._history = [
+		{"speaker": "主持人", "text": "昨夜平安夜。", "visibility": "public", "at": 10},
+		{"speaker": "主持人", "text": "请 1号 张安 发言。", "visibility": "public", "at": 11},
+	]
+	page._werewolf = {
+		"phase": "day_discussion",
+		"day": 1,
+		"map_name": "标准村庄",
+		"has_sheriff": false,
+		"votes": {},
+		"night": {},
+		"current_action": {},
+		"speech_index": 0,
+		"witch_antidote": false,
+		"witch_poison": true,
+		"last_guarded_index": -1,
+		"post_game": {"stage": ""},
+	}
+	var context: Dictionary = page._bot_speech_context(0, {})
+	var payload: Dictionary = page._bot_runtime.to_model_payload(context)
+	var current_state := String(payload.get("current_state", ""))
+	assert(current_state.contains("昨夜平安夜"))
+	assert(not current_state.contains("没有可见的夜间被刀信息"))
+	assert(not current_state.contains("今晚被袭击"))
+	assert(not current_state.contains("解药："))
+	assert(not current_state.contains("毒药："))
 
 
 func _check_hunter_shoot_schema_and_parser(page) -> void:
