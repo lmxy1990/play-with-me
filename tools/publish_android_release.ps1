@@ -34,8 +34,18 @@ function Get-TagCommit {
 function Test-GhReleaseExists {
     param([string]$TagName)
 
-    & gh release view $TagName 1>$null 2>$null
-    return ($LASTEXITCODE -eq 0)
+    $output = & gh release list --limit 200 --json tagName 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return $false
+    }
+
+    $outputText = (($output | Out-String).Trim())
+    if ([string]::IsNullOrWhiteSpace($outputText)) {
+        return $false
+    }
+
+    $releases = $outputText | ConvertFrom-Json
+    return ($null -ne ($releases | Where-Object { $_.tagName -eq $TagName } | Select-Object -First 1))
 }
 
 if ([string]::IsNullOrWhiteSpace($ReleaseKeystore)) {
@@ -81,8 +91,7 @@ foreach ($abi in $Abis) {
         -Apk $apkPath `
         -ReleaseKeystore $ReleaseKeystore `
         -ReleaseKeystoreUser $ReleaseKeystoreUser `
-        -ReleaseKeystorePassword $ReleaseKeystorePassword `
-        -WaitForExit
+        -ReleaseKeystorePassword $ReleaseKeystorePassword
     Assert-ExternalSuccess "Android release export failed for $abi."
 
     if (-not (Test-Path $apkPath)) {

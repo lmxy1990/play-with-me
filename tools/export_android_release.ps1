@@ -181,7 +181,12 @@ try {
                 break
             }
         }
-        if (-not $stoppedAfterApkReady -and $proc.HasExited -and $proc.ExitCode -ne 0) {
+        if (-not $stoppedAfterApkReady -and $proc.HasExited) {
+            $proc.WaitForExit()
+            if ($proc.ExitCode -ne 0) {
+                throw "Godot release export failed with exit code $($proc.ExitCode). See $stderr"
+            }
+        } elseif (-not $stoppedAfterApkReady -and -not $proc.HasExited) {
             throw "Godot release export failed with exit code $($proc.ExitCode). See $stderr"
         }
     }
