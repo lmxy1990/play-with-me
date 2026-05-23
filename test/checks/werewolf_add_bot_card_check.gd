@@ -37,6 +37,9 @@ func _initialize() -> void:
 	room._open_add_bot_dialog(1)
 	await process_frame
 
+	var overlay := room.find_child("AddBotDialogOverlay", true, false) as Control
+	assert(overlay != null)
+
 	var list := room.find_child("AddBotProfileList", true, false) as GridContainer
 	assert(list != null)
 	assert(list.get_child_count() == 1)
@@ -53,8 +56,9 @@ func _initialize() -> void:
 	assert(String(room._players[1].get("name", "")) == "Alpha Bot")
 	assert(not room._players[1].has("bot_profile_id"))
 	assert(not room._players[1].has("model"))
-	assert(not room._players[1].has("voice"))
-	# Local device keeps private AI config in the seat-private cache; snapshots and tasks strip it.
+	assert(String(room._players[1].get("voice", "")) == "系统默认")
+	assert(String(room._players[1].get("voiceName", "")) == "系统默认")
+	# Local device keeps private AI model config in the seat-private cache; snapshots and tasks strip it.
 	var private_profile: Dictionary = room._local_private_bot_profile_for_seat(1)
 	assert(String(private_profile.get("id", "")) == "card_bot_alpha")
 	assert(String(private_profile.get("model", "")) == "qwen-plus")

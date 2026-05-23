@@ -2,6 +2,7 @@ extends SceneTree
 
 
 var _overlay_root: Control
+var _overlay_requests: Array = []
 var _confirmed_targets: Array = []
 var _submitted_speeches: Array = []
 var _saved_names: Array = []
@@ -9,6 +10,10 @@ var _removed_bot_indices: Array = []
 var _players := [
 	{"name": "一号", "state": "存活", "alive": true, "owner": "self", "avatar": ""},
 	{"name": "二号", "state": "死亡", "alive": false, "owner": "bot", "avatar": "", "controller_participant_id": "host"},
+	{"name": "三号", "state": "存活", "alive": true, "owner": "bot", "avatar": ""},
+	{"name": "四号", "state": "存活", "alive": true, "owner": "self", "avatar": ""},
+	{"name": "五号", "state": "存活", "alive": true, "owner": "bot", "avatar": ""},
+	{"name": "六号", "state": "存活", "alive": true, "owner": "self", "avatar": ""},
 ]
 
 
@@ -23,6 +28,15 @@ func _initialize() -> void:
 		return
 	var badge_card := _overlay_root.find_child("TargetConfirmOverlay", true, false)
 	if not _expect(badge_card != null, "target confirm card is named"):
+		return
+	if not _expect(_last_overlay_locks_user(), "target confirm cannot close without action"):
+		return
+	if not _expect(_find_button(badge_card, "取消") == null, "target confirm has no cancel close"):
+		return
+	var target_grid := badge_card.find_child("TargetSeatGrid", true, false) as GridContainer
+	if not _expect(target_grid != null and target_grid.columns == 5, "target confirm uses five-column seat grid"):
+		return
+	if not _expect(target_grid.get_child_count() == _players.size(), "target confirm lists all seats"):
 		return
 	var destroy_button := _find_button(badge_card, "撕警徽")
 	if not _expect(destroy_button != null, "destroy badge button exists"):
@@ -40,8 +54,53 @@ func _initialize() -> void:
 	var pass_button := _find_button(_overlay_root.find_child("TargetConfirmOverlay", true, false), "飞警徽")
 	if not _expect(pass_button != null and pass_button.disabled, "dead player cannot receive badge"):
 		return
+	_confirmed_targets.clear()
+	var witch_state := {
+		"current_action": {"key": "witch_act"},
+		"night": {"wolf_target_index": 2},
+		"witch_antidote": true,
+		"witch_poison": true,
+	}
+	var witch_save_result: Dictionary = controller.open_target_confirm(2, _players, witch_state, 0, "女巫行动", _callbacks())
+	if not _expect(bool(witch_save_result.get("ok", false)), "witch target confirm opens"):
+		return
+	var witch_card := _overlay_root.find_child("TargetConfirmOverlay", true, false)
+	if not _expect(witch_card != null, "witch target confirm card exists"):
+		return
+	var save_button := _find_button(witch_card, "用药")
+	if not _expect(save_button != null and not save_button.disabled, "witch save button exists"):
+		return
+	save_button.emit_signal("pressed")
+	if not _expect(_confirmed_targets.size() == 1, "witch save emits target action"):
+		return
+	if not _expect(int(_confirmed_targets[0].get("target", -1)) == 2, "witch save targets wolf target"):
+		return
+	if not _expect(String(_confirmed_targets[0].get("action", "")) == "witch_save", "witch save action is explicit"):
+		return
+	_confirmed_targets.clear()
+	controller.open_target_confirm(2, _players, witch_state, 0, "女巫行动", _callbacks())
+	witch_card = _overlay_root.find_child("TargetConfirmOverlay", true, false)
+	var seat_four := _find_button(witch_card, "4号")
+	if not _expect(seat_four != null and not seat_four.disabled, "witch poison target seat exists"):
+		return
+	seat_four.emit_signal("pressed")
+	var poison_button := _find_button(witch_card, "用毒")
+	if not _expect(poison_button != null and not poison_button.disabled, "witch poison button exists"):
+		return
+	poison_button.emit_signal("pressed")
+	if not _expect(_confirmed_targets.size() == 1, "witch poison emits target action"):
+		return
+	if not _expect(int(_confirmed_targets[0].get("target", -1)) == 3, "witch poison uses selected target"):
+		return
+	if not _expect(String(_confirmed_targets[0].get("action", "")) == "witch_poison", "witch poison action is explicit"):
+		return
 	var speech_result: Dictionary = controller.open_speech_editor(0, _players, _callbacks())
 	if not _expect(bool(speech_result.get("ok", false)), "speech editor opens"):
+		return
+	if not _expect(_last_overlay_locks_user(), "speech editor cannot close without speech action"):
+		return
+	var speech_card := _overlay_root.find_child("SpeechEditorOverlay", true, false)
+	if not _expect(_find_button(speech_card, "取消") == null, "speech editor has no cancel close"):
 		return
 	var input := _overlay_root.find_child("SpeechInput", true, false) as TextEdit
 	if not _expect(input != null, "speech input exists"):
@@ -60,10 +119,10 @@ func _initialize() -> void:
 	if not _expect(name_input != null and name_input.text == "一号", "name editor shows current name"):
 		return
 	name_input.text = "新名字"
-	var save_button := _find_button(_overlay_root.find_child("OverlayCard", true, false), "保存")
-	if not _expect(save_button != null, "save name button exists"):
+	var save_name_button := _find_button(_overlay_root.find_child("OverlayCard", true, false), "保存")
+	if not _expect(save_name_button != null, "save name button exists"):
 		return
-	save_button.emit_signal("pressed")
+	save_name_button.emit_signal("pressed")
 	if not _expect(_saved_names.size() == 1 and String(_saved_names[0].get("name", "")) == "新名字", "save name callback receives text"):
 		return
 	var detail_result: Dictionary = controller.open_seat_detail(1, _players, _callbacks())
@@ -119,7 +178,12 @@ func _callbacks() -> Dictionary:
 	}
 
 
-func _overlay_card(title: String, _size: Vector2) -> PanelContainer:
+func _overlay_card(title: String, _size: Vector2, close_on_outside: bool = true, show_close_button: bool = true) -> PanelContainer:
+	_overlay_requests.append({
+		"title": title,
+		"close_on_outside": close_on_outside,
+		"show_close_button": show_close_button,
+	})
 	_clear_modal()
 	var card := PanelContainer.new()
 	card.name = "OverlayCard"
@@ -128,6 +192,13 @@ func _overlay_card(title: String, _size: Vector2) -> PanelContainer:
 	card.add_child(body)
 	_overlay_root.add_child(card)
 	return card
+
+
+func _last_overlay_locks_user() -> bool:
+	if _overlay_requests.is_empty():
+		return false
+	var request: Dictionary = _overlay_requests.back()
+	return not bool(request.get("close_on_outside", true)) and not bool(request.get("show_close_button", true))
 
 
 func _overlay_body(card: Node) -> VBoxContainer:

@@ -1,6 +1,6 @@
 param(
     [ValidateNotNullOrEmpty()]
-    [string]$Version = "1.1.0",
+    [string]$Version = "1.2.0",
     [ValidateSet("arm64-v8a", "x86_64", "universal")]
     [string[]]$Abis = @("arm64-v8a", "x86_64", "universal"),
     [string]$Godot = "D:\ProgramData\Godot_v4.6.2\Godot_v4.6.2-stable_win64_console.exe",

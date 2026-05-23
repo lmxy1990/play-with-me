@@ -39,19 +39,33 @@ func _check_reconnect_tokens(registry) -> void:
 func _check_observer_registry(registry) -> void:
 	var room := {"allow_observers": true, "max_observers": 1}
 	assert(bool(registry.can_add_observer(room).get("ok", false)))
-	registry.register_observer(room, "o1", "观察者", {"deviceId": "d1", "publicKey": "p1"})
+	registry.register_observer(room, "o1", "观察者", {"deviceId": "d1", "publicKey": "p1"}, {
+		"avatarId": "avatar_custom",
+		"avatar": "res://custom/avatar.png",
+		"playbackVoiceConfigId": "voice_custom",
+		"voiceName": "系统默认",
+	})
 	assert(int(registry.observer_count(room)) == 1)
 	assert(registry.is_observer_participant(room, "o1"))
 	assert(String(registry.observer_for_participant(room, "o1").get("displayName", "")) == "观察者")
+	assert(String(registry.observer_for_participant(room, "o1").get("avatarId", "")) == "avatar_custom")
+	assert(String(registry.observer_for_participant(room, "o1").get("avatar", "")) == "res://custom/avatar.png")
+	assert(String(registry.observer_for_participant(room, "o1").get("playbackVoiceConfigId", "")) == "voice_custom")
+	assert(String(registry.observer_for_participant(room, "o1").get("voiceName", "")) == "系统默认")
 	assert(registry.observer_message_is_read_only(room, "o1", "chat_message"))
 	assert(not registry.observer_message_is_read_only(room, "o1", "switch_seat"))
 	assert(not registry.observer_message_is_read_only(room, "o1", "leave_room"))
 	var full: Dictionary = registry.can_add_observer(room)
 	assert(not bool(full.get("ok", false)))
 	assert(String(full.get("code", "")) == "observer_full")
-	registry.register_observer(room, "o1", "旁观者", {"deviceId": "d2", "publicKey": "p2"})
+	registry.register_observer(room, "o1", "旁观者", {"deviceId": "d2", "publicKey": "p2"}, {
+		"avatarId": "avatar_updated",
+		"playbackVoiceConfigId": "voice_updated",
+	})
 	assert(int(registry.observer_count(room)) == 1)
 	assert(String(registry.observer_for_participant(room, "o1").get("displayName", "")) == "旁观者")
+	assert(String(registry.observer_for_participant(room, "o1").get("avatarId", "")) == "avatar_updated")
+	assert(String(registry.observer_for_participant(room, "o1").get("playbackVoiceConfigId", "")) == "voice_updated")
 	assert(registry.remove_observer(room, "o1"))
 	assert(int(registry.observer_count(room)) == 0)
 	room["allow_observers"] = false

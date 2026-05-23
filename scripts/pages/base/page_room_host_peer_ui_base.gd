@@ -20,7 +20,17 @@ func _host_set_peer_ready(peer_id: int, ready: bool) -> void:
 
 func _host_switch_peer_seat(peer_id: int, target_index: int) -> void:
 	var participant_id := String(_room_network_session.call("peer_participant_id", peer_id)).strip_edges()
+	var session_seat := int(_room_network_session.call("peer_seat_index", peer_id))
+	if OS.is_debug_build():
+		_network_debug("host switch_seat start peer=%d participant=%s session_seat=%d target=%d" % [
+			peer_id,
+			participant_id,
+			session_seat,
+			target_index,
+		])
 	if participant_id == "":
+		if OS.is_debug_build():
+			_network_debug("host switch_seat rejected peer=%d reason=no_participant target=%d" % [peer_id, target_index])
 		_send_network_rejection(peer_id, "请先加入房间")
 		return
 	var players := _state_array("_players")
@@ -28,13 +38,25 @@ func _host_switch_peer_seat(peer_id: int, target_index: int) -> void:
 	var from_index := _seat_for_participant_id(participant_id)
 	var observer := _observer_for_participant(room, participant_id)
 	if from_index < 0 and observer.is_empty():
+		if OS.is_debug_build():
+			_network_debug("host switch_seat rejected peer=%d participant=%s reason=not_in_room session_seat=%d target=%d" % [peer_id, participant_id, session_seat, target_index])
 		_send_network_rejection(peer_id, "请先加入房间")
 		return
 	if target_index < 0 or target_index >= players.size() or not _bool_call("_is_empty_seat", [target_index]):
+		if OS.is_debug_build():
+			_network_debug("host switch_seat rejected peer=%d participant=%s reason=target_unavailable from=%d target=%d players=%d" % [peer_id, participant_id, from_index, target_index, players.size()])
 		_send_network_rejection(peer_id, "目标座位不可用")
 		return
 	var gate := _room_can_change_seat_gate()
 	if not bool(gate.get("ok", false)):
+		if OS.is_debug_build():
+			_network_debug("host switch_seat rejected peer=%d participant=%s reason=gate from=%d target=%d message=%s" % [
+				peer_id,
+				participant_id,
+				from_index,
+				target_index,
+				String(gate.get("message", "")),
+			])
 		_send_network_rejection(peer_id, String(gate.get("message", "不能切换座位")))
 		return
 	var display_name := "玩家"
@@ -42,7 +64,10 @@ func _host_switch_peer_seat(peer_id: int, target_index: int) -> void:
 		display_name = String(players[from_index].get("name", "玩家"))
 	elif not observer.is_empty():
 		display_name = String(observer.get("displayName", "玩家"))
-	var player_value = _call_if_present("_human_player_data", [participant_id, display_name])
+	var identity := observer.duplicate(true) if not observer.is_empty() else {}
+	identity["name"] = display_name
+	identity["displayName"] = display_name
+	var player_value = _call_if_present("_human_player_data", [participant_id, display_name, identity, target_index])
 	var player: Dictionary = player_value if player_value is Dictionary else {}
 	if from_index >= 0 and from_index < players.size():
 		player = (players[from_index] as Dictionary).duplicate(true)
@@ -60,6 +85,15 @@ func _host_switch_peer_seat(peer_id: int, target_index: int) -> void:
 	set("_players", players)
 	_room_network_session.call("set_peer_participant", peer_id, participant_id, target_index, String(player.get("name", display_name)))
 	_set_system_message("%s 落座 %d号位" % [String(player.get("name", "玩家")), target_index + 1])
+	if OS.is_debug_build():
+		_network_debug("host switch_seat ok peer=%d participant=%s from=%d target=%d was_observer=%s display=%s" % [
+			peer_id,
+			participant_id,
+			from_index,
+			target_index,
+			str(not observer.is_empty()),
+			String(player.get("name", display_name)),
+		])
 	_call_if_present("_refresh_all_seats")
 	_call_if_present("_refresh_room_controls")
 	_call_if_present("_refresh_center_panel")
@@ -96,7 +130,7 @@ func _host_switch_peer_to_observer(peer_id: int) -> void:
 	_register_observer(room, participant_id, String(player.get("name", "观察者")), {
 		"deviceId": String(player.get("device_id", "")),
 		"publicKey": String(player.get("public_key", "")),
-	})
+	}, player)
 	var empty_value = _call_if_present("_empty_seat_data", [index])
 	players[index] = empty_value if empty_value is Dictionary else {}
 	set("_players", players)
@@ -133,6 +167,7 @@ func _host_add_peer_bot(peer_id: int, payload: Dictionary) -> void:
 	var bot_serial := int(get("_bot_serial"))
 	if name == "":
 		name = "机器人%d" % [bot_serial]
+	var profile := _network_player_identity_payload(payload, name)
 	if OS.is_debug_build():
 		print("[MainUI][debug] host_add_controlled_player accepted peer=%d participant=%s seat=%d name=%s serial=%d" % [
 			peer_id,
@@ -141,14 +176,15 @@ func _host_add_peer_bot(peer_id: int, payload: Dictionary) -> void:
 			name,
 			bot_serial,
 		])
-	var bot_value = _call_if_present("_bot_player_data", ["", name, "", "", participant_id])
+	var bot_value = _call_if_present("_bot_player_data", ["", name, "", String(profile.get("voice", profile.get("voiceName", ""))), participant_id, profile, index])
 	if not (bot_value is Dictionary):
 		_send_network_rejection(peer_id, "机器人数据创建失败")
 		return
+	name = String((bot_value as Dictionary).get("name", name))
 	players[index] = bot_value
 	set("_players", players)
 	set("_bot_serial", bot_serial + 1)
-	_set_system_message("受控玩家加入 %d号位" % [index + 1])
+	_set_system_message("%s 加入 %d号位" % [name, index + 1])
 	_call_if_present("_refresh_seat", [index])
 	_call_if_present("_refresh_room_controls")
 	_call_if_present("_refresh_active_room_bot_occupancy")
@@ -194,6 +230,8 @@ func _host_remove_peer_bot(peer_id: int, payload: Dictionary) -> void:
 
 
 func _host_update_peer_participant(peer_id: int, payload: Dictionary) -> void:
+	_send_network_rejection(peer_id, "房间内不能修改名字")
+	return
 	var participant_id := String(_room_network_session.call("peer_participant_id", peer_id))
 	var target_index := _payload_seat_index(payload)
 	if target_index < 0:

@@ -104,13 +104,13 @@ func _initialize() -> void:
 	if not _expect(absf(float((room._center_speech_items.back() as Dictionary).get("progress", 0.0)) - 0.5) < 0.01, "center speech progress never moves backward"):
 		return
 	await process_frame
-	var progress_label := room.find_child("CenterSpeechTextLabel", true, false) as Label
+	var progress_label := room.find_child("CenterSpeechTextLabel", true, false) as RichTextLabel
 	if not _expect(progress_label != null, "center speech progress renders text label"):
 		return
 	var progress_text := String(progress_label.text)
 	if not _expect(String((room._center_speech_items.back() as Dictionary).get("text", "")) == String(progress_item.get("text", "")), "center speech keeps full original text in state while progress updates"):
 		return
-	if not _expect(String(progress_item.get("text", "")).find(progress_text) == 0 and progress_text.length() > 0 and progress_text.length() < String(progress_item.get("text", "")).length(), "center speech label reveals text by playback progress"):
+	if not _expect(progress_text.find("[b]同步") >= 0 and progress_text.find("播放") >= 0 and progress_text.find("进度。") >= 0, "center speech highlights playback progress while keeping full text"):
 		return
 
 	room._center_speech_items.clear()
@@ -133,11 +133,20 @@ func _initialize() -> void:
 		return
 	if not _expect(absf(float((room._center_speech_items[0] as Dictionary).get("progress", 0.0)) - 0.5) < 0.01, "sanitized tts item keeps progress on original display entry"):
 		return
-	await process_frame
-	var tts_progress_label := room.find_child("CenterSpeechTextLabel", true, false) as Label
+	if room._tts_runtime != null:
+		room._tts_runtime._current = tts_item.duplicate(true)
+		room._tts_runtime._duration = 10.0
+		room._tts_runtime._elapsed = 1.0
+	room._refresh_center_panel()
+	var tts_progress_label := room.find_child("CenterSpeechTextLabel", true, false) as RichTextLabel
 	var tts_visible_text := String(tts_progress_label.text) if tts_progress_label != null else ""
-	if not _expect(tts_progress_label != null and String(display_item.get("text", "")).find(tts_visible_text) == 0 and tts_visible_text.length() > 0 and tts_visible_text.length() < String(display_item.get("text", "")).length(), "tts center label reveals original display text by playback progress"):
+	if not _expect(tts_progress_label != null and tts_visible_text.find("投票给") >= 0 and tts_visible_text.find("ki") >= 0 and tts_visible_text.find("mi-k2.6。") >= 0 and tts_visible_text.find("[b]") >= 0, "tts center label highlights original display text by playback progress"):
 		return
+	var skip_button := room.find_child("CenterSpeechSkipButton", true, false) as Button
+	if not _expect(skip_button != null and skip_button.visible, "center speech shows skip playback button while tts is active"):
+		return
+	if room._tts_runtime != null:
+		room._tts_runtime.stop()
 
 	room._center_speech_items.clear()
 	room._center_speech_pending_items.clear()
@@ -151,8 +160,8 @@ func _initialize() -> void:
 	if not _expect(String((room._center_speech_items.back() as Dictionary).get("text", "")) == "玩家语音生成时也要先展示，不被主持人提示马上覆盖。", "tts player speech stays in center while playback is pending"):
 		return
 	await process_frame
-	var queued_tts_label := room.find_child("CenterSpeechTextLabel", true, false) as Label
-	if not _expect(queued_tts_label != null and String(queued_tts_label.text) == "", "tts player speech text is not dumped before playback progress"):
+	var queued_tts_label := room.find_child("CenterSpeechTextLabel", true, false) as RichTextLabel
+	if not _expect(queued_tts_label != null and String(queued_tts_label.text).find("玩家语音生成时也要先展示") >= 0, "tts player speech text is visible before playback progress"):
 		return
 	if not _expect(room._center_speech_pending_items.size() == 1, "following tts prompt waits in the center speech queue"):
 		return
@@ -234,14 +243,14 @@ func _initialize() -> void:
 		return
 	if not _expect(String((room._center_speech_items.back() as Dictionary).get("text", "")) == "这条发言要进入历史并立即显示。", "submitted speech appears in center panel immediately"):
 		return
-	var live_label := room.find_child("CenterSpeechTextLabel", true, false) as Label
-	if not _expect(live_label != null and String(live_label.text) != "这条发言要进入历史并立即显示。", "submitted tts speech does not dump full text before playback progress"):
+	var live_label := room.find_child("CenterSpeechTextLabel", true, false) as RichTextLabel
+	if not _expect(live_label != null and String(live_label.text).find("这条发言要进入历史并立即显示。") >= 0, "submitted tts speech shows full text before playback progress"):
 		return
 	room._update_center_speech_progress(live_item, 0.6)
 	await process_frame
-	live_label = room.find_child("CenterSpeechTextLabel", true, false) as Label
+	live_label = room.find_child("CenterSpeechTextLabel", true, false) as RichTextLabel
 	var live_visible_text := String(live_label.text) if live_label != null else ""
-	if not _expect(live_label != null and String(live_item.get("text", "")).find(live_visible_text) == 0 and live_visible_text.length() > 0 and live_visible_text.length() < String(live_item.get("text", "")).length(), "submitted tts speech reveals text by playback progress"):
+	if not _expect(live_label != null and live_visible_text.find("这条发言要进入历史") >= 0 and live_visible_text.find("立即显示。") >= 0 and live_visible_text.find("[b]") >= 0, "submitted tts speech highlights text by playback progress"):
 		return
 
 	room._open_history()
@@ -255,6 +264,7 @@ func _initialize() -> void:
 	var backdrop := room._modal_layer.find_child("ModalOutsideCloseArea", false, false) as Control
 	if not _expect(backdrop != null, "history overlay has outside-close backdrop"):
 		return
+	await create_timer(0.35).timeout
 	_click_control(backdrop)
 	await process_frame
 	if not _expect(room._modal_layer.get_child_count() == 0, "clicking outside overlay closes modal"):

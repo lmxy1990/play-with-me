@@ -8,6 +8,11 @@ var _werewolf_human_interaction_controller = WerewolfHumanPlayerInteractionContr
 var _werewolf_human_state_controller = WerewolfHumanPlayerStateControllerScript.new()
 
 func _on_seat_pressed(index: int) -> void:
+	if OS.is_debug_build():
+		var empty := true
+		if index >= 0 and index < _players.size():
+			empty = _is_empty_seat(index)
+		print("[WerewolfSeatClick][debug] room_seat_pressed index=%d empty=%s pending=%s speech=%d local=%d" % [index, str(empty), _pending_action, _speech_prompt_index, _local_player_index])
 	_play_click()
 	_selected_player_index = index
 	if _pending_action != "":
@@ -45,6 +50,8 @@ func _on_seat_name_edit_pressed(index: int) -> void:
 
 
 func _on_seat_voice_toggle_pressed(index: int) -> void:
+	if OS.is_debug_build():
+		print("[WerewolfSeatClick][debug] room_voice_toggle index=%d title=%s" % [index, _player_title(index)])
 	_play_click()
 	_toggle_player_tts(index, false)
 
@@ -57,7 +64,6 @@ func _open_empty_seat_actions(index: int) -> void:
 	if seat == null:
 		return
 	_modal_layer.add_child(_seat_bubble_outside_close_area())
-	var seat_center: Vector2 = seat.global_position + seat.size * 0.5
 	var is_observer := _is_observer_participant(_current_network_participant_id())
 	var seat_text := "切换"
 	if is_observer:
@@ -65,11 +71,10 @@ func _open_empty_seat_actions(index: int) -> void:
 	elif _local_player_index < 0:
 		seat_text = "落座"
 	var left := _seat_bubble(_werewolf_action_path("seat"), seat_text, true, func(): _sit_at(index))
-	left.position = seat_center + Vector2(-122, -20)
 	_modal_layer.add_child(left)
 	var right := _seat_bubble(_werewolf_action_path("bot"), "机器人", false, func(): _open_add_bot_dialog(index))
-	right.position = seat_center + Vector2(28, -20)
 	_modal_layer.add_child(right)
+	_layout_seat_bubbles_above(seat, [left, right])
 
 
 func _open_observer_slot_actions(_slot_index: int) -> void:
@@ -151,6 +156,48 @@ func _seat_bubble(icon_path: String, text: String, primary: bool, callback: Call
 	return button
 
 
+func _layout_seat_bubbles_above(seat: Control, bubbles: Array) -> void:
+	if seat == null or bubbles.is_empty():
+		return
+	var valid_bubbles := []
+	for value in bubbles:
+		if value is Control:
+			valid_bubbles.append(value)
+	if valid_bubbles.is_empty():
+		return
+	var spacing := 10.0
+	var total_width := -spacing
+	var max_height := 0.0
+	for bubble in valid_bubbles:
+		var control := bubble as Control
+		var bubble_size := _seat_bubble_size(control)
+		total_width += bubble_size.x + spacing
+		max_height = maxf(max_height, bubble_size.y)
+	var avatar_top_center := Vector2(seat.global_position.x + seat.size.x * 0.5, seat.global_position.y + 4.0)
+	var x := avatar_top_center.x - total_width * 0.5
+	var y := avatar_top_center.y - max_height - 10.0
+	var viewport_size := get_viewport_rect().size
+	x = clampf(x, 8.0, maxf(8.0, viewport_size.x - total_width - 8.0))
+	y = maxf(8.0, y)
+	var cursor := x
+	for bubble in valid_bubbles:
+		var control := bubble as Control
+		var bubble_size := _seat_bubble_size(control)
+		control.position = Vector2(cursor, y + (max_height - bubble_size.y) * 0.5) - _modal_layer.global_position
+		control.size = bubble_size
+		cursor += bubble_size.x + spacing
+
+
+func _seat_bubble_size(control: Control) -> Vector2:
+	var size := control.size
+	var minimum := control.get_combined_minimum_size()
+	size.x = maxf(size.x, minimum.x)
+	size.y = maxf(size.y, minimum.y)
+	if size.x <= 0.0 or size.y <= 0.0:
+		size = Vector2(104, 42)
+	return size
+
+
 func _seat_bubble_outside_close_area() -> Control:
 	var area := Control.new()
 	area.name = "ModalOutsideCloseArea"
@@ -220,6 +267,14 @@ func _sit_at(index: int) -> void:
 		return
 	if _is_network_client():
 		var sent := bool(_room_network_session.call("request_switch_seat", index))
+		if OS.is_debug_build() and has_method("_network_debug"):
+			call("_network_debug", "client sit_request target=%d sent=%s participant=%s local_index=%d observer=%s" % [
+				index,
+				str(sent),
+				_current_network_participant_id(),
+				_local_player_index,
+				str(_is_observer_participant(_current_network_participant_id())),
+			])
 		if not sent:
 			_system_message = "房间连接不可用"
 		elif _is_observer_participant(_current_network_participant_id()):
@@ -233,14 +288,18 @@ func _sit_at(index: int) -> void:
 	var participant_id := _current_network_participant_id()
 	var was_observer := _is_observer_participant(participant_id)
 	var observer := _observer_for_participant(_active_room(), participant_id) if was_observer else {}
-	var player_data := _local_player_data()
+	var player_data: Dictionary
 	if was_observer and not observer.is_empty():
-		var observer_name := _observer_display_name(observer, _local_nickname)
-		player_data["name"] = observer_name
-		_local_nickname = observer_name
+		var observer_identity := observer.duplicate(true)
+		observer_identity["name"] = _observer_display_name(observer, _local_nickname)
+		observer_identity["displayName"] = observer_identity["name"]
+		player_data = _room_player_factory.self_player_from_identity(participant_id, observer_identity, _players, -1, SeatMotion.IDLE)
+		_local_nickname = String(player_data.get("name", _local_nickname))
 		player_data["device_id"] = String(observer.get("device_id", observer.get("deviceId", "")))
 		player_data["public_key"] = String(observer.get("public_key", observer.get("publicKey", "")))
 		_remove_observer(_active_room(), participant_id)
+	else:
+		player_data = _local_player_data(_local_player_index)
 	if _local_player_index >= 0 and _local_player_index < _players.size():
 		_players[_local_player_index] = _empty_seat_data(_local_player_index)
 	player_data["ready"] = false
@@ -273,7 +332,7 @@ func _ensure_local_room_slot() -> bool:
 		return false
 	var empty_index := _first_empty_seat()
 	if empty_index >= 0:
-		var player_data := _local_player_data()
+		var player_data := _local_player_data(empty_index)
 		player_data["ready"] = false
 		player_data["state"] = "等待"
 		_players[empty_index] = player_data
@@ -284,7 +343,7 @@ func _ensure_local_room_slot() -> bool:
 		return true
 	var observer_gate := _can_add_observer(room)
 	if bool(observer_gate.get("ok", false)):
-		_register_observer(room, participant_id, _local_nickname, _device_identity.auth_payload())
+		_register_observer(room, participant_id, _local_nickname, _device_identity.auth_payload(), _preference_identity_snapshot())
 		_local_player_index = -1
 		_system_message = "已进入观战位"
 		_refresh_active_room_bot_occupancy()
@@ -374,12 +433,54 @@ func _save_name(index: int, text: String) -> void:
 
 
 func _open_seat_detail(index: int) -> void:
+	if OS.is_debug_build():
+		var empty := true
+		if index >= 0 and index < _players.size():
+			empty = _is_empty_seat(index)
+		print("[WerewolfSeatClick][debug] open_seat_detail request index=%d empty=%s title=%s" % [index, str(empty), _player_title(index)])
 	var result: Dictionary = _werewolf_human_interaction_controller.open_seat_detail(index, _players, _werewolf_human_interaction_callbacks())
 	if bool(result.get("ok", false)):
+		if OS.is_debug_build():
+			print("[WerewolfSeatClick][debug] open_seat_detail ok index=%d" % index)
 		return
+	if OS.is_debug_build():
+		print("[WerewolfSeatClick][debug] open_seat_detail failed index=%d message=%s" % [index, String(result.get("message", ""))])
 	_system_message = String(result.get("message", "座位不存在"))
 	_show_room_system_message_toast()
 	_flash_effect(String(result.get("effect", "skip")))
+
+
+func _center_speech_avatar(entry: Dictionary) -> Control:
+	var avatar := super._center_speech_avatar(entry)
+	_wire_player_avatar_detail(avatar, int(entry.get("speaker_index", -1)))
+	return avatar
+
+
+func _wire_player_avatar_detail(avatar: Control, seat_index: int) -> void:
+	if avatar == null:
+		return
+	if seat_index < 0 or seat_index >= _players.size() or _is_empty_seat(seat_index):
+		avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return
+	avatar.mouse_filter = Control.MOUSE_FILTER_STOP
+	avatar.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	avatar.tooltip_text = "查看玩家详情"
+	avatar.gui_input.connect(func(event: InputEvent):
+		if not _player_avatar_detail_click_event(event):
+			return
+		avatar.accept_event()
+		_play_click()
+		_open_seat_detail(seat_index)
+	)
+
+
+func _player_avatar_detail_click_event(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		return mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT
+	if event is InputEventScreenTouch:
+		return (event as InputEventScreenTouch).pressed
+	return false
 
 
 func _open_target_confirm(index: int) -> void:

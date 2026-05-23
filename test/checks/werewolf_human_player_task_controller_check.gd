@@ -53,6 +53,11 @@ func _initialize() -> void:
 		return
 	if not _expect(int(destroy_payload.get("targetSeatNumber", 99)) == -1, "destroy badge action has no target seat"):
 		return
+	var skip_payload: Dictionary = controller.action_result_payload(2, "witch_skip")
+	if not _expect(int(skip_payload.get("targetIndex", 99)) == -1, "skip action has no target"):
+		return
+	if not _expect(int(skip_payload.get("targetSeatNumber", 99)) == -1, "skip action has no target seat"):
+		return
 	var speech_payload: Dictionary = controller.speech_result_payload("我发言。")
 	if not _expect(String(speech_payload.get("type", "")) == "player_speech", "speech result type is generic"):
 		return

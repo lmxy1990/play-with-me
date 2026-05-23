@@ -6,6 +6,7 @@ const BookPopupScene := preload("res://scenes/common/book_popup.tscn")
 var _hud_layer: Control
 var _modal_layer: Control
 var _toast_tween: Tween
+var _modal_outside_close_guard_until_msec := 0
 
 
 func _book_status(status: Label, text: String, color: Color) -> void:
@@ -54,7 +55,7 @@ func _show_toast(text: String, color: Color = BOOK_GREEN) -> void:
 	_toast_tween.tween_callback(toast.queue_free)
 
 
-func _modal_backdrop(color: Color, close_callback: Callable = Callable()) -> ColorRect:
+func _modal_backdrop(color: Color, close_callback: Callable = Callable(), close_on_outside: bool = true) -> ColorRect:
 	var shade := ColorRect.new()
 	shade.name = "ModalOutsideCloseArea"
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -64,6 +65,12 @@ func _modal_backdrop(color: Color, close_callback: Callable = Callable()) -> Col
 		if not _modal_outside_close_event(event):
 			return
 		shade.accept_event()
+		if not close_on_outside:
+			return
+		if _modal_outside_close_guard_active():
+			if OS.is_debug_build():
+				print("[ModalLayer][debug] outside_close ignored reason=open_guard")
+			return
 		call("_play_click")
 		if close_callback.is_valid():
 			close_callback.call()
@@ -82,9 +89,18 @@ func _modal_outside_close_event(event: InputEvent) -> bool:
 	return false
 
 
-func _overlay_card(title: String, size: Vector2) -> PanelContainer:
+func _begin_modal_outside_close_guard(duration_msec: int = 260) -> void:
+	_modal_outside_close_guard_until_msec = Time.get_ticks_msec() + maxi(0, duration_msec)
+
+
+func _modal_outside_close_guard_active() -> bool:
+	return Time.get_ticks_msec() < _modal_outside_close_guard_until_msec
+
+
+func _overlay_card(title: String, size: Vector2, close_on_outside: bool = true, show_close_button: bool = true) -> PanelContainer:
 	call("_clear_modal")
-	_modal_layer.add_child(_modal_backdrop(Color(0.42, 0.28, 0.10, 0.055)))
+	_begin_modal_outside_close_guard()
+	_modal_layer.add_child(_modal_backdrop(Color(0.42, 0.28, 0.10, 0.055), Callable(), close_on_outside))
 
 	var card := _panel(Color(0.97, 0.88, 0.66, 0.94), Color(0.56, 0.34, 0.12, 0.42), 8)
 	card.name = "OverlayCard"
@@ -116,7 +132,8 @@ func _overlay_card(title: String, size: Vector2) -> PanelContainer:
 	var fill := Control.new()
 	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(fill)
-	head.add_child(_close_icon_button(func(): call("_clear_modal"), true))
+	if show_close_button:
+		head.add_child(_close_icon_button(func(): call("_clear_modal"), true))
 
 	var body := VBoxContainer.new()
 	body.name = "Body"
@@ -128,6 +145,7 @@ func _overlay_card(title: String, size: Vector2) -> PanelContainer:
 
 
 func _config_drawer(title: String, close_callback: Callable) -> VBoxContainer:
+	_begin_modal_outside_close_guard()
 	_modal_layer.add_child(_modal_backdrop(Color(0.42, 0.28, 0.10, 0.055), close_callback))
 
 	var card := _panel(Color(0.97, 0.88, 0.66, 0.95), Color(0.56, 0.34, 0.12, 0.42), 8)
@@ -170,6 +188,7 @@ func _config_drawer(title: String, close_callback: Callable) -> VBoxContainer:
 
 func _book_popup(title: String, size: Vector2, close_callback: Callable = Callable()) -> Dictionary:
 	call("_clear_modal")
+	_begin_modal_outside_close_guard()
 	var callback := func():
 		call("_play_click")
 		if close_callback.is_valid():
@@ -290,6 +309,7 @@ func _style_book_checkbox(checkbox: CheckBox) -> void:
 
 func _lobby_overlay_card(title: String, size: Vector2) -> PanelContainer:
 	call("_clear_modal")
+	_begin_modal_outside_close_guard()
 	_modal_layer.add_child(_modal_backdrop(Color(0.42, 0.28, 0.10, 0.055)))
 
 	var card := _panel(Color(0.92, 0.82, 0.60, 0.94), Color(0.54, 0.34, 0.13, 0.44), 8)
@@ -335,6 +355,7 @@ func _lobby_overlay_card(title: String, size: Vector2) -> PanelContainer:
 
 func _side_overlay(title: String) -> PanelContainer:
 	call("_clear_modal")
+	_begin_modal_outside_close_guard()
 	_modal_layer.add_child(_modal_backdrop(Color(0.42, 0.28, 0.10, 0.055)))
 
 	var card := _panel(Color(0.97, 0.88, 0.66, 0.95), Color(0.56, 0.34, 0.12, 0.42), 8)

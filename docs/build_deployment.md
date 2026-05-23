@@ -146,7 +146,7 @@ release 脚本会临时开启：
 
 正式发版前需要在 `export_presets.cfg` 中补齐 release keystore、版本号和目标 ABI。
 
-## 发布 1.1.0
+## 发布 1.2.0
 
 现成的发版脚本会先构建 release AAR，再导出下面 3 个安装包：
 
@@ -163,7 +163,7 @@ $env:PLAY_WITH_ME_RELEASE_KEYSTORE_PASSWORD = "<release-keystore-password>"
 .\tools\publish_android_release.ps1
 ```
 
-脚本会复用现有的 `gh` 登录态创建或更新 `v1.1.0` release，不会把账号 token 或本地 git 敏感信息写进仓库。
+脚本会复用现有的 `gh` 登录态创建或更新 `v1.2.0` release，不会把账号 token 或本地 git 敏感信息写进仓库。
 
 ## 安装和推送
 
@@ -226,7 +226,7 @@ Android 预设文件：`export_presets.cfg`
 
 - 预设名称：`Android`
 - 包名：`com.playwithme.godot`
-- 版本名：`1.1.0`
+- 版本名：`1.2.0`
 - Gradle build：启用
 - 相机、网络、Wi-Fi 状态和多播权限：启用
 - Debug keystore：`C:/Users/Administrator/AppData/Roaming/Godot/keystores/debug.keystore`

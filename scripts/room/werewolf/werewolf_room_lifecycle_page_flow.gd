@@ -2,6 +2,8 @@ extends "res://scripts/player/werewolf/ai/ai_werewolf_player_page_flow.gd"
 
 
 func _publish_active_room() -> void:
+	if not _is_network_host():
+		return
 	var room := _active_room()
 	if room.is_empty() or bool(room.get("discovered", false)):
 		return
@@ -451,26 +453,38 @@ func _host_apply_peer_speech(peer_id: int, payload: Dictionary) -> void:
 	print("[WerewolfDeviceTask][error] legacy chat_message rejected peer=%d payload=%s" % [peer_id, JSON.stringify(payload)])
 
 
-func _local_player_data() -> Dictionary:
+func _local_player_data(ignore_index: int = -1) -> Dictionary:
 	if _local_player_index >= 0 and _local_player_index < _players.size() and String(_players[_local_player_index].get("owner", "")) == "self":
 		var current: Dictionary = _players[_local_player_index].duplicate(true)
-		current["name"] = _local_nickname
+		var unique_ignore_index := ignore_index if ignore_index >= 0 else _local_player_index
+		current["name"] = _room_player_factory.room_unique_name(String(current.get("name", _local_nickname)), _players, unique_ignore_index, "玩家")
 		current["owner"] = "self"
 		current["participant_id"] = _current_network_participant_id()
+		_local_nickname = String(current.get("name", _local_nickname))
 		return current
-	return _room_player_factory.self_player(_current_network_participant_id(), _local_nickname, SeatMotion.IDLE)
+	var player := _room_player_factory.self_player_from_identity(_current_network_participant_id(), _preference_identity_snapshot(), _players, ignore_index, SeatMotion.IDLE)
+	_local_nickname = String(player.get("name", _local_nickname))
+	return player
 
 
 func _empty_seat_data(index: int) -> Dictionary:
 	return _room_player_factory.empty_seat(index, SeatMotion.IDLE)
 
 
-func _human_player_data(participant_id: String, display_name: String) -> Dictionary:
-	return _room_player_factory.human_player(participant_id, display_name, SeatMotion.IDLE)
+func _human_player_data(participant_id: String, display_name: String, identity: Dictionary = {}, ignore_index: int = -1) -> Dictionary:
+	var source := identity.duplicate(true)
+	if String(source.get("name", source.get("displayName", ""))).strip_edges() == "":
+		source["name"] = display_name
+	return _room_player_factory.human_player_from_identity(participant_id, source, _players, ignore_index, SeatMotion.IDLE)
 
 
-func _bot_player_data(_bot_profile_id: String, bot_name: String, _model_name: String = "", _voice_name: String = "", controller_participant_id: String = "") -> Dictionary:
-	return _room_player_factory.bot_player(_bot_serial, bot_name, controller_participant_id, SeatMotion.IDLE)
+func _bot_player_data(_bot_profile_id: String, bot_name: String, _model_name: String = "", _voice_name: String = "", controller_participant_id: String = "", profile: Dictionary = {}, ignore_index: int = -1) -> Dictionary:
+	var source := profile.duplicate(true)
+	if String(source.get("name", source.get("displayName", ""))).strip_edges() == "":
+		source["name"] = bot_name
+	if String(source.get("voice", source.get("voiceName", ""))).strip_edges() == "" and _voice_name.strip_edges() != "":
+		source["voice"] = _voice_name
+	return _room_player_factory.bot_player_from_profile(_bot_serial, source, controller_participant_id, _players, ignore_index, SeatMotion.IDLE)
 
 
 func _visible_role_for_index(index: int) -> String:

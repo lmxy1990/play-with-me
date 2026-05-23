@@ -47,6 +47,68 @@ func _apply_preference_identity_to_runtime() -> void:
 		_app_state.local_nickname = nickname
 
 
+func _preference_identity_snapshot() -> Dictionary:
+	var nickname := _local_nickname.strip_edges()
+	var avatar_id := ""
+	var avatar_path := ""
+	var playback_voice_config_id := "voice_system_default"
+	var repository = _ensure_preference_repository()
+	if repository != null:
+		var result: Dictionary = repository.get_preferences()
+		if bool(result.get("ok", false)):
+			var state: Dictionary = result.get("state", {})
+			var preferred_name := String(state.get("nickname", "")).strip_edges()
+			if preferred_name != "":
+				nickname = preferred_name
+			avatar_id = String(state.get("avatar_id", "")).strip_edges()
+			playback_voice_config_id = String(state.get("playback_voice_config_id", playback_voice_config_id)).strip_edges()
+			avatar_path = _preference_avatar_path(avatar_id)
+	if nickname == "":
+		nickname = "玩家"
+	if playback_voice_config_id == "":
+		playback_voice_config_id = "voice_system_default"
+	return {
+		"nickname": nickname,
+		"displayName": nickname,
+		"avatar_id": avatar_id,
+		"avatarId": avatar_id,
+		"avatar": avatar_path,
+		"playback_voice_config_id": playback_voice_config_id,
+		"playbackVoiceConfigId": playback_voice_config_id,
+		"voice_config_id": playback_voice_config_id,
+		"voiceConfigId": playback_voice_config_id,
+	}
+
+
+func _preference_avatar_path(avatar_id: String) -> String:
+	var clean := avatar_id.strip_edges()
+	if clean == "":
+		return ""
+	var repository = _ensure_preference_repository()
+	if repository == null or not repository.has_method("list_avatars"):
+		return ""
+	var result: Dictionary = repository.list_avatars()
+	if not bool(result.get("ok", false)):
+		return ""
+	var avatars_value = result.get("avatars", [])
+	if not (avatars_value is Array):
+		return ""
+	for item in avatars_value as Array:
+		if item is Dictionary and String((item as Dictionary).get("id", "")).strip_edges() == clean:
+			return String((item as Dictionary).get("path", "")).strip_edges()
+	return ""
+
+
+func _preference_identity_network_payload() -> Dictionary:
+	var identity := _preference_identity_snapshot()
+	return {
+		"avatarId": String(identity.get("avatarId", "")),
+		"avatar": String(identity.get("avatar", "")),
+		"playbackVoiceConfigId": String(identity.get("playbackVoiceConfigId", "")),
+		"voiceConfigId": String(identity.get("voiceConfigId", "")),
+	}
+
+
 func _ensure_device_identity_loaded() -> void:
 	if _app_state != null:
 		_device_identity.persistence_enabled = bool(_app_state.persistence_enabled)

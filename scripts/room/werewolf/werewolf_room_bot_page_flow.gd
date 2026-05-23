@@ -25,6 +25,7 @@ func _open_add_bot_dialog(index: int) -> void:
 		minf(520.0, maxf(360.0, viewport_size.y - 48.0))
 	)
 	var card := _overlay_card("添加机器人", popup_size)
+	card.name = "AddBotDialogOverlay"
 	var body := _overlay_body(card)
 	body.add_child(_dense_form_label("点击卡片添加到 %d号位" % [index + 1]))
 	if enabled_profiles.is_empty():
@@ -54,8 +55,6 @@ func _open_add_bot_dialog(index: int) -> void:
 	actions.add_theme_constant_override("separation", 6)
 	body.add_child(actions)
 	actions.add_child(_small_button("取消", false, func(): _clear_modal()))
-
-
 func _add_bot_at(index: int, bot_profile: Dictionary = {}) -> void:
 	var gate: Dictionary = _room_runtime.can_add_bot(_werewolf)
 	if not bool(gate.get("ok", false)):
@@ -113,7 +112,7 @@ func _add_bot_at(index: int, bot_profile: Dictionary = {}) -> void:
 		])
 	if _is_network_client():
 		_cache_local_private_bot_profile_for_seat(index, profile)
-		var sent := bool(_room_network_session.call("request_add_controlled_player", index, final_name))
+		var sent := bool(_room_network_session.call("request_add_controlled_player", index, final_name, _public_bot_identity_payload(profile)))
 		if OS.is_debug_build():
 			print("[WerewolfRoom][debug] add_bot network_request seat=%d profile_id=%s sent=%s private_cached=true" % [index, bot_profile_id, str(sent)])
 		_system_message = "已发送添加机器人请求" if sent else "房间连接不可用"
@@ -121,22 +120,13 @@ func _add_bot_at(index: int, bot_profile: Dictionary = {}) -> void:
 		_clear_modal()
 		_flash_effect("guard" if sent else "skip")
 		return
-	var avatars := _werewolf_bot_avatar_paths()
-	var avatar_index := (_bot_serial - 1) % avatars.size()
-	_players[index] = {
-		"id": "player_%d" % _bot_serial,
-		"name": final_name,
-		"role": "未知",
-		"role_key": "",
-		"avatar": avatars[avatar_index],
-		"state": "已准备",
-		"motion": SeatMotion.IDLE,
-		"alive": true,
-		"ready": true,
-		"owner": "human",
-		"participant_id": "",
-		"controller_participant_id": _current_network_participant_id(),
-	}
+	var bot_value = _bot_player_data(bot_profile_id, final_name, model_name, voice_name, _current_network_participant_id(), profile, index)
+	if not (bot_value is Dictionary):
+		_system_message = "机器人数据创建失败"
+		_show_room_system_message_toast()
+		_flash_effect("skip")
+		return
+	_players[index] = bot_value
 	_cache_local_bot_private_fields(index, profile)
 	if has_method("_initialize_controlled_bot_model_profiles"):
 		call("_initialize_controlled_bot_model_profiles", "add_bot_local", true)
@@ -163,6 +153,14 @@ func _cache_local_bot_private_fields(index: int, profile: Dictionary) -> void:
 	if index < 0 or index >= _players.size() or not (_players[index] is Dictionary):
 		return
 	_cache_local_private_bot_profile_for_seat(index, profile)
+
+
+func _public_bot_identity_payload(profile: Dictionary) -> Dictionary:
+	return {
+		"avatarId": String(profile.get("avatar_id", profile.get("avatarId", ""))).strip_edges(),
+		"avatar": String(profile.get("avatar_path", profile.get("avatarPath", profile.get("avatar", "")))).strip_edges(),
+		"voiceName": String(profile.get("voice", profile.get("voiceName", ""))).strip_edges(),
+	}
 
 
 func _remove_bot_at(index: int) -> void:

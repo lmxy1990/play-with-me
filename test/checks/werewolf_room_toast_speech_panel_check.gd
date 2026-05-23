@@ -75,6 +75,15 @@ func _initialize() -> void:
 	await process_frame
 	if not _expect(room._center_speech_items.size() == 1, "first speech is shown in center panel"):
 		return
+	var center_avatar := room.find_child("CenterSpeechAvatar", true, false) as Control
+	if not _expect(center_avatar != null, "center speech has a clickable player avatar"):
+		return
+	center_avatar.emit_signal("gui_input", _mouse_click(center_avatar.size * 0.5))
+	await process_frame
+	if not _expect(room.find_child("SeatDetailOverlay", true, false) != null, "clicking center speech avatar opens seat detail"):
+		return
+	room._clear_modal()
+	await process_frame
 	var first_entry := room.find_child("CenterSpeechEntry", true, false)
 	room._update_center_speech_progress(first, 0.25)
 	await process_frame
@@ -141,6 +150,14 @@ func _contains_label(root_node: Node, text: String) -> bool:
 		if _contains_label(child, text):
 			return true
 	return false
+
+
+func _mouse_click(position: Vector2) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	event.position = position
+	return event
 
 
 func _expect(condition: bool, message: String) -> bool:

@@ -160,7 +160,7 @@ func _on_tts_speech_failed(item: Dictionary, error: String) -> void:
 	elif has_method("_fail_center_speech_item"):
 		call("_fail_center_speech_item", item, error)
 		var reason := error.strip_edges()
-		if reason != "" and reason != "stopped" and has_method("_show_system_progress_toast"):
+		if reason != "" and reason != "stopped" and reason != "skipped" and has_method("_show_system_progress_toast"):
 			call("_show_system_progress_toast", "语音播放失败：%s" % reason, 5.0)
 		if has_method("_complete_local_presentation_ack"):
 			call("_complete_local_presentation_ack", item, "tts_failed")

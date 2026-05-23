@@ -3,6 +3,11 @@ extends "res://scripts/pages/base/page_room_replica_ui_base.gd"
 const RoomNetworkCodecScript := preload("res://scripts/network/room_network_codec.gd")
 
 
+func _network_debug(message: String) -> void:
+	if OS.is_debug_build():
+		print("[RoomNetwork][debug] %s" % message)
+
+
 func _build_join_payload(_as_observer: bool = false) -> String:
 	var room := _active_room()
 	if room.is_empty():
@@ -164,16 +169,21 @@ func _join_room_from_payload(payload: String, interactive: bool = false) -> bool
 	_ensure_room_network_session()
 	if _room_network_session != null:
 		_room_network_port = int(parsed.get("port", _room_network_port))
+		var identity := _preference_identity_snapshot()
+		var display_name := String(identity.get("displayName", identity.get("nickname", _state_string("_local_nickname")))).strip_edges()
 		var connect_result: Dictionary = _room_network_session.call(
 			"connect_to_room",
 			String(parsed.get("host", "")),
 			int(parsed.get("port", 0)),
 			room_id,
 			String(parsed.get("joinToken", "")),
-			_state_string("_local_nickname"),
+			display_name,
 			false,
 			String(parsed.get("hostDeviceId", "")),
-			String(parsed.get("hostPublicKey", ""))
+			String(parsed.get("hostPublicKey", "")),
+			"",
+			"",
+			identity
 		)
 		_scan_debug("network connect result ok=%s error=%s" % [str(bool(connect_result.get("ok", false))), String(connect_result.get("error", ""))])
 		if not bool(connect_result.get("ok", false)):
@@ -208,12 +218,15 @@ func _join_secure_room_from_payload(parsed: Dictionary, payload: String, interac
 	_set_system_message("已读取加密加入码，正在连接房主")
 	if interactive:
 		_set_scan_join_waiting("正在加入")
+	var identity := _preference_identity_snapshot()
+	var display_name := String(identity.get("displayName", identity.get("nickname", _state_string("_local_nickname")))).strip_edges()
 	var result: Dictionary = _room_network_session.call(
 		"connect_to_secure_qr",
 		host,
 		port,
 		parsed,
-		_state_string("_local_nickname")
+		display_name,
+		identity
 	)
 	_scan_debug("secure connect result ok=%s error=%s" % [str(bool(result.get("ok", false))), String(result.get("error", ""))])
 	if not bool(result.get("ok", false)):
@@ -274,6 +287,15 @@ func _reconnect_last_room() -> bool:
 		String(session.get("participantId", "")),
 		String(session.get("reconnectToken", ""))
 	)
+	_network_debug("client reconnect_last_room host=%s port=%d room=%s participant=%s observer=%s ok=%s error=%s" % [
+		host,
+		port,
+		room_id,
+		String(session.get("participantId", "")),
+		str(bool(session.get("isObserver", false))),
+		str(bool(result.get("ok", false))),
+		String(result.get("error", "")),
+	])
 	if not bool(result.get("ok", false)):
 		_set_system_message(String(result.get("error", "重连失败")))
 		_call_if_present("_flash_effect", ["skip"])
@@ -303,6 +325,12 @@ func _broadcast_network_snapshot() -> void:
 func _on_network_join_accepted(payload: Dictionary) -> void:
 	_sync_scan_join_ui_state()
 	_scan_debug("network join accepted scan_active=%s keys=%s" % [str(_scan_join_active), JSON.stringify(payload.keys())])
+	_network_debug("client join accepted participant=%s reconnected=%s seat=%s observer=%s" % [
+		String(payload.get("participantId", "")),
+		str(bool(payload.get("reconnected", false))),
+		str((payload.get("participant", {}) as Dictionary).get("seatNumber", "")) if payload.get("participant", {}) is Dictionary else "",
+		str((payload.get("participant", {}) as Dictionary).get("observer", "")) if payload.get("participant", {}) is Dictionary else "",
+	])
 	var snapshot_value = payload.get("room", {})
 	if snapshot_value is Dictionary:
 		_apply_network_snapshot(snapshot_value as Dictionary)
@@ -323,6 +351,7 @@ func _on_network_join_rejected(message: String) -> void:
 	_sync_scan_join_ui_state()
 	_set_system_message("加入失败：%s" % message)
 	_scan_debug("network join rejected scan_active=%s message=%s" % [str(_scan_join_active), _state_string("_system_message")])
+	_network_debug("client join rejected message=%s" % message)
 	if _scan_join_active:
 		_stop_scan_join_waiting()
 		_set_scan_status(_state_string("_system_message"), RED)
@@ -365,6 +394,8 @@ func _save_reconnect_session(payload: Dictionary) -> void:
 
 
 func _on_network_server_message_received(type: String, _message_id: String, payload: Dictionary) -> void:
+	if OS.is_debug_build() and ["action_rejected", "device_task", "room_closed", "room_replica_frame"].has(type):
+		_network_debug("client server_message type=%s payload_keys=%s" % [type, str(payload.keys())])
 	if type == "action_rejected":
 		_set_system_message(String(payload.get("message", "操作被房主拒绝")))
 		_call_if_present("_refresh_center_panel")
@@ -398,6 +429,11 @@ func _handle_server_room_closed(payload: Dictionary) -> void:
 func _on_network_status_changed(message: String) -> void:
 	if message.strip_edges() == "":
 		return
+	_network_debug("status_changed role_client=%s mode=%s message=%s" % [
+		str(_is_network_client()),
+		str(int(get("_mode"))),
+		message,
+	])
 	_sync_scan_join_ui_state()
 	if _scan_join_active and _scan_join_waiting_network:
 		_set_scan_join_waiting(message)
@@ -414,6 +450,10 @@ func _on_network_peer_disconnected(peer_id: int) -> void:
 	var participant_id := ""
 	if _room_network_session != null and _room_network_session.has_method("peer_participant_id"):
 		participant_id = String(_room_network_session.call("peer_participant_id", peer_id)).strip_edges()
+	var seat_index := -1
+	if _room_network_session != null and _room_network_session.has_method("peer_seat_index"):
+		seat_index = int(_room_network_session.call("peer_seat_index", peer_id))
+	_network_debug("host peer_disconnected peer=%d participant=%s seat=%d" % [peer_id, participant_id, seat_index])
 	_call_if_present("_host_mark_peer_left", [peer_id])
 	if participant_id != "":
 		_call_if_present("_host_drop_presentation_ack_participant", [participant_id])
@@ -423,6 +463,15 @@ func _on_network_peer_disconnected(peer_id: int) -> void:
 func _on_network_client_message_received(peer_id: int, type: String, message_id: String, payload: Dictionary) -> void:
 	if not _is_network_host():
 		return
+	if OS.is_debug_build() and ["join_room", "join_room_as_observer", "reconnect_room", "switch_seat", "switch_to_observer", "player_ready", "player_unready", "add_controlled_player", "remove_controlled_player", "leave_room"].has(type):
+		_network_debug("host client_message peer=%d type=%s message=%s payload_keys=%s seat=%d participant=%s" % [
+			peer_id,
+			type,
+			message_id,
+			str(payload.keys()),
+			int(_room_network_session.call("peer_seat_index", peer_id)) if _room_network_session != null else -1,
+			String(_room_network_session.call("peer_participant_id", peer_id)) if _room_network_session != null else "",
+		])
 	if type == "presentation_ack":
 		_call_if_present("_host_apply_presentation_ack", [peer_id, payload])
 		return
@@ -519,7 +568,17 @@ func _host_accept_network_join(peer_id: int, message_id: String, payload: Dictio
 	var room := _active_room()
 	var requested_room_id := String(payload.get("roomId", "")).strip_edges()
 	var active_room_id := String(room.get("id", "")).strip_edges()
+	_network_debug("host accept_join start peer=%d reconnect=%s observer=%s requested_room=%s active_room=%s display=%s participant=%s" % [
+		peer_id,
+		str(is_reconnect),
+		str(as_observer),
+		requested_room_id,
+		active_room_id,
+		String(payload.get("displayName", "")).strip_edges(),
+		String(payload.get("participantId", "")).strip_edges(),
+	])
 	if not is_reconnect and (requested_room_id == "" or active_room_id == "" or requested_room_id != active_room_id):
+		_network_debug("host accept_join rejected peer=%d code=room_mismatch requested_room=%s active_room=%s" % [peer_id, requested_room_id, active_room_id])
 		_room_network_session.call("send_to_peer", peer_id, "join_rejected", {
 			"code": "room_mismatch",
 			"message": "房间ID不匹配，二维码可能已失效",
@@ -528,12 +587,14 @@ func _host_accept_network_join(peer_id: int, message_id: String, payload: Dictio
 	var password := String(room.get("password", "")).strip_edges()
 	var token := String(payload.get("joinToken", "")).strip_edges()
 	if not is_reconnect and bool(_call_if_present("_is_game_started")):
+		_network_debug("host accept_join rejected peer=%d code=game_already_started" % peer_id)
 		_room_network_session.call("send_to_peer", peer_id, "join_rejected", {
 			"code": "game_already_started",
 			"message": "游戏开始后不能加入房间",
 		}, message_id)
 		return
 	if not is_reconnect and password != "" and token != password:
+		_network_debug("host accept_join rejected peer=%d code=wrong_password token_present=%s" % [peer_id, str(token != "")])
 		_room_network_session.call("send_to_peer", peer_id, "join_rejected", {"code": "wrong_password", "message": "密码错误"}, message_id)
 		return
 	if is_reconnect:
@@ -546,6 +607,7 @@ func _host_accept_network_join(peer_id: int, message_id: String, payload: Dictio
 	if participant_id == "":
 		participant_id = "peer_%d_%d" % [peer_id, Time.get_ticks_msec()]
 	var auth := _network_auth_payload(payload)
+	var identity := _network_player_identity_payload(payload, display_name)
 	var seat_index := -1
 	var players := _state_array("_players")
 	if not as_observer:
@@ -554,18 +616,21 @@ func _host_accept_network_join(peer_id: int, message_id: String, payload: Dictio
 		if seat_index < 0:
 			var observer_gate := _can_add_observer(room)
 			if not bool(observer_gate.get("ok", false)):
+				_network_debug("host accept_join rejected peer=%d code=%s observer_gate" % [peer_id, String(observer_gate.get("code", ""))])
 				_room_network_session.call("send_to_peer", peer_id, "join_rejected", observer_gate, message_id)
 				return
-			_register_observer(room, participant_id, display_name, auth)
+			_register_observer(room, participant_id, display_name, auth, identity)
 			as_observer = true
 			_room_network_session.call("set_peer_participant", peer_id, participant_id, -1, display_name)
 			_set_system_message("%s 进入观战位" % display_name)
 		else:
-			var player_value = _call_if_present("_human_player_data", [participant_id, display_name])
+			var player_value = _call_if_present("_human_player_data", [participant_id, display_name, identity, seat_index])
 			if not (player_value is Dictionary):
+				_network_debug("host accept_join rejected peer=%d code=player_create_failed participant=%s seat=%d" % [peer_id, participant_id, seat_index])
 				_room_network_session.call("send_to_peer", peer_id, "join_rejected", {"code": "player_create_failed", "message": "玩家数据创建失败"}, message_id)
 				return
 			var player: Dictionary = player_value
+			display_name = String(player.get("name", display_name))
 			player["device_id"] = String(auth.get("deviceId", ""))
 			player["public_key"] = String(auth.get("publicKey", ""))
 			players[seat_index] = player
@@ -575,9 +640,10 @@ func _host_accept_network_join(peer_id: int, message_id: String, payload: Dictio
 	else:
 		var observer_gate := _can_add_observer(room)
 		if not bool(observer_gate.get("ok", false)):
+			_network_debug("host accept_join rejected peer=%d code=%s observer_gate" % [peer_id, String(observer_gate.get("code", ""))])
 			_room_network_session.call("send_to_peer", peer_id, "join_rejected", observer_gate, message_id)
 			return
-		_register_observer(room, participant_id, display_name, auth)
+		_register_observer(room, participant_id, display_name, auth, identity)
 		_room_network_session.call("set_peer_participant", peer_id, participant_id, -1, display_name)
 		_set_system_message("%s 旁观加入" % display_name)
 	var reconnect_token := _ensure_network_reconnect_token(room, participant_id)
@@ -591,6 +657,14 @@ func _host_accept_network_join(peer_id: int, message_id: String, payload: Dictio
 		"room": snapshot,
 		"roomReplicaFrame": _signed_room_replica_payload(),
 	}, message_id)
+	_network_debug("host accept_join ok peer=%d participant=%s seat=%d observer=%s display=%s peers=%s" % [
+		peer_id,
+		participant_id,
+		seat_index,
+		str(as_observer),
+		display_name,
+		str(_room_network_session.call("peer_debug_snapshot")) if _room_network_session != null and _room_network_session.has_method("peer_debug_snapshot") else "",
+	])
 	_call_if_present("_refresh_all_seats")
 	_call_if_present("_refresh_room_controls")
 	_call_if_present("_refresh_center_panel")
@@ -601,11 +675,19 @@ func _host_accept_network_reconnect(peer_id: int, message_id: String, payload: D
 	var room := _active_room()
 	var participant_id := String(payload.get("participantId", "")).strip_edges()
 	var reconnect_token := String(payload.get("reconnectToken", "")).strip_edges()
+	_network_debug("host reconnect start peer=%d participant=%s token_present=%s" % [peer_id, participant_id, str(reconnect_token != "")])
 	if participant_id == "" or reconnect_token == "":
+		_network_debug("host reconnect rejected peer=%d reason=incomplete participant=%s token_present=%s" % [peer_id, participant_id, str(reconnect_token != "")])
 		_room_network_session.call("send_to_peer", peer_id, "join_rejected", {"message": "重连信息不完整"}, message_id)
 		return
 	var stored_token := _network_reconnect_token(room, participant_id)
 	if stored_token != "" and stored_token != reconnect_token:
+		_network_debug("host reconnect rejected peer=%d participant=%s reason=token_mismatch stored=%s incoming=%s" % [
+			peer_id,
+			participant_id,
+			str(stored_token != ""),
+			str(reconnect_token != ""),
+		])
 		_room_network_session.call("send_to_peer", peer_id, "join_rejected", {"message": "重连凭证无效"}, message_id)
 		return
 	var auth := _network_auth_payload(payload)
@@ -614,12 +696,15 @@ func _host_accept_network_reconnect(peer_id: int, message_id: String, payload: D
 	var observer := _observer_for_participant(room, participant_id)
 	var players := _state_array("_players")
 	if seat_index < 0 and observer.is_empty():
+		_network_debug("host reconnect rejected peer=%d participant=%s reason=not_in_room" % [peer_id, participant_id])
 		_room_network_session.call("send_to_peer", peer_id, "join_rejected", {"message": "参与者不在房间内"}, message_id)
 		return
 	if seat_index >= 0 and not _network_identity_matches(players[seat_index] as Dictionary, auth):
+		_network_debug("host reconnect rejected peer=%d participant=%s reason=seat_identity_mismatch seat=%d" % [peer_id, participant_id, seat_index])
 		_room_network_session.call("send_to_peer", peer_id, "join_rejected", {"message": "设备身份不匹配"}, message_id)
 		return
 	if not observer.is_empty() and not _network_identity_matches(observer, auth):
+		_network_debug("host reconnect rejected peer=%d participant=%s reason=observer_identity_mismatch" % [peer_id, participant_id])
 		_room_network_session.call("send_to_peer", peer_id, "join_rejected", {"message": "设备身份不匹配"}, message_id)
 		return
 	var display_name := String(observer.get("displayName", "观察者")) if seat_index < 0 else String((players[seat_index] as Dictionary).get("name", "玩家"))
@@ -642,6 +727,14 @@ func _host_accept_network_reconnect(peer_id: int, message_id: String, payload: D
 		"room": snapshot,
 		"roomReplicaFrame": _signed_room_replica_payload(),
 	}, message_id)
+	_network_debug("host reconnect ok peer=%d participant=%s seat=%d observer=%s display=%s peers=%s" % [
+		peer_id,
+		participant_id,
+		seat_index,
+		str(seat_index < 0),
+		display_name,
+		str(_room_network_session.call("peer_debug_snapshot")) if _room_network_session != null and _room_network_session.has_method("peer_debug_snapshot") else "",
+	])
 	_set_system_message("%s 已重连" % display_name)
 	if seat_index >= 0 and bool(_call_if_present("_is_werewolf_paused")) and not bool(_call_if_present("_has_offline_human_players")):
 		_call_if_present("_set_werewolf_paused", [false, "", ""])
@@ -651,6 +744,23 @@ func _host_accept_network_reconnect(peer_id: int, message_id: String, payload: D
 	_call_if_present("_refresh_center_panel")
 	_call_if_present("_commit_state")
 	_call_if_present("_schedule_auto_resolve_bot_turns")
+
+
+func _network_player_identity_payload(payload: Dictionary, display_name: String) -> Dictionary:
+	var voice_config_id := String(payload.get("voiceConfigId", payload.get("playbackVoiceConfigId", ""))).strip_edges()
+	return {
+		"name": display_name,
+		"displayName": display_name,
+		"avatar_id": String(payload.get("avatarId", payload.get("avatar_id", ""))).strip_edges(),
+		"avatarId": String(payload.get("avatarId", payload.get("avatar_id", ""))).strip_edges(),
+		"avatar": String(payload.get("avatar", "")).strip_edges(),
+		"voice_config_id": voice_config_id,
+		"voiceConfigId": voice_config_id,
+		"playback_voice_config_id": voice_config_id,
+		"playbackVoiceConfigId": voice_config_id,
+		"voice": String(payload.get("voiceName", payload.get("voice", ""))).strip_edges(),
+		"voiceName": String(payload.get("voiceName", payload.get("voice", ""))).strip_edges(),
+	}
 
 
 func _game_id_for_room_type(game_type: String) -> String:

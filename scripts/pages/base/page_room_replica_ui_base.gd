@@ -69,7 +69,7 @@ func _network_roster_hash(room: Dictionary) -> String:
 
 
 func _players_for_participant(participant_id: String) -> Array:
-	return _room_snapshot_builder.players_for_participant(_state_array("_players"), participant_id)
+	return _room_snapshot_builder.players_for_participant(_state_array("_players"), participant_id, _active_room(), _state_dictionary("_werewolf"))
 
 
 func _participant_can_view_wolf_private_history(participant_id: String) -> bool:

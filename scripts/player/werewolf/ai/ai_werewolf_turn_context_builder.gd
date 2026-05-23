@@ -745,8 +745,8 @@ func visible_role_key(input: Dictionary, viewer_index: int, target_index: int) -
 
 
 func is_role_publicly_revealed(player: Dictionary) -> bool:
-	return bool(player.get("role_visible", false)) \
-		or bool(player.get("roleVisible", false)) \
+	return bool(player.get("public_role_visible", false)) \
+		or bool(player.get("publicRoleVisible", false)) \
 		or _idiot_publicly_revealed_by_vote(player)
 
 

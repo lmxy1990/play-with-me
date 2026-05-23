@@ -62,13 +62,17 @@ func _build_table_hud() -> void:
 	player_bar.anchor_right = 1.0
 	player_bar.anchor_top = 1.0
 	player_bar.anchor_bottom = 1.0
-	player_bar.offset_left = -214
+	player_bar.offset_left = -282
 	player_bar.offset_right = -16
 	player_bar.offset_top = -52
 	player_bar.offset_bottom = -14
 	player_bar.alignment = BoxContainer.ALIGNMENT_END
 	player_bar.add_theme_constant_override("separation", 6)
 	_hud_layer.add_child(player_bar)
+	_pause_button = _small_button(_pause_button_text(), false, func(): call("_toggle_werewolf_pause_from_button"))
+	_pause_button.name = "PauseGameButton"
+	_pause_button.visible = _should_show_pause_button()
+	player_bar.add_child(_pause_button)
 	_ready_button = _small_button(_ready_button_text(), true, func(): call("_toggle_ready"))
 	player_bar.add_child(_ready_button)
 	_start_button = _small_button("开始", true, func(): call("_start_game_from_button"))

@@ -37,6 +37,7 @@ var _client_host := ""
 var _client_room_id := ""
 var _client_join_token := ""
 var _client_display_name := ""
+var _client_identity_payload := {}
 var _client_as_observer := false
 var _client_expected_host_device_id := ""
 var _client_expected_host_public_key := ""
@@ -57,6 +58,12 @@ var _port := 0
 var _message_serial := 1
 var _local_participant_id := ""
 var _device_identity := {}
+var _client_last_ready_state := -1
+
+
+func _debug(message: String) -> void:
+	if OS.is_debug_build():
+		print("[RoomNetworkSession][debug] %s" % message)
 
 
 func role() -> String:
@@ -113,7 +120,7 @@ func start_host(preferred_port: int = DEFAULT_PORT, bind_address: String = "*") 
 	return {"ok": false, "port": 0, "error": error}
 
 
-func connect_to_room(host: String, port_value: int, room_id: String, join_token: String, display_name: String, as_observer: bool = false, expected_host_device_id: String = "", expected_host_public_key: String = "", reconnect_participant_id: String = "", reconnect_token: String = "") -> Dictionary:
+func connect_to_room(host: String, port_value: int, room_id: String, join_token: String, display_name: String, as_observer: bool = false, expected_host_device_id: String = "", expected_host_public_key: String = "", reconnect_participant_id: String = "", reconnect_token: String = "", identity_payload: Dictionary = {}) -> Dictionary:
 	stop()
 	var clean_host := host.strip_edges()
 	if clean_host == "" or port_value <= 0:
@@ -127,6 +134,7 @@ func connect_to_room(host: String, port_value: int, room_id: String, join_token:
 	_client_host = clean_host
 	_client_join_token = join_token.strip_edges()
 	_client_display_name = display_name.strip_edges()
+	_client_identity_payload = _public_identity_payload(identity_payload)
 	_client_as_observer = as_observer
 	_client_expected_host_device_id = expected_host_device_id.strip_edges()
 	_client_expected_host_public_key = expected_host_public_key.strip_edges()
@@ -146,20 +154,36 @@ func connect_to_room(host: String, port_value: int, room_id: String, join_token:
 	_client_hello_sent = false
 	_client_opened = false
 	_client_join_sent = false
+	_client_last_ready_state = -1
 	_role = ROLE_CLIENT
 	_port = port_value
 	var url := "ws://%s:%d" % [clean_host, port_value]
+	_debug("connect_to_room host=%s port=%d room=%s observer=%s reconnect_participant=%s reconnect_token=%s join_token=%s display=%s expected_host_device=%s expected_host_public=%s identity_keys=%s" % [
+		clean_host,
+		port_value,
+		_client_room_id,
+		str(as_observer),
+		_client_reconnect_participant_id,
+		str(_client_reconnect_token != ""),
+		str(_client_join_token != ""),
+		_client_display_name,
+		str(_client_expected_host_device_id != ""),
+		str(_client_expected_host_public_key != ""),
+		str(_client_identity_payload.keys()),
+	])
 	var err := _client_peer.connect_to_url(url)
 	if err != OK:
 		var message := "连接房间失败：%s" % error_string(err)
+		_debug("connect_to_room failed url=%s error=%s" % [url, error_string(err)])
 		stop()
 		status_changed.emit(message)
 		return {"ok": false, "error": message}
+	_debug("connect_to_room connecting url=%s" % url)
 	status_changed.emit("正在连接房间：%s" % url)
 	return {"ok": true, "error": ""}
 
 
-func connect_to_secure_qr(host: String, port_value: int, secure_payload: Dictionary, display_name: String) -> Dictionary:
+func connect_to_secure_qr(host: String, port_value: int, secure_payload: Dictionary, display_name: String, identity_payload: Dictionary = {}) -> Dictionary:
 	stop()
 	var clean_host := host.strip_edges()
 	if clean_host == "" or port_value <= 0:
@@ -183,6 +207,7 @@ func connect_to_secure_qr(host: String, port_value: int, secure_payload: Diction
 	_client_room_id = ""
 	_client_join_token = ""
 	_client_display_name = display_name.strip_edges()
+	_client_identity_payload = _public_identity_payload(identity_payload)
 	_client_as_observer = false
 	_client_expected_host_device_id = ""
 	_client_expected_host_public_key = ""
@@ -201,20 +226,39 @@ func connect_to_secure_qr(host: String, port_value: int, secure_payload: Diction
 	_client_hello_sent = false
 	_client_opened = false
 	_client_join_sent = false
+	_client_last_ready_state = -1
 	_role = ROLE_CLIENT
 	_port = port_value
 	var url := "ws://%s:%d" % [clean_host, port_value]
+	_debug("connect_to_secure_qr host=%s port=%d secret_id=%s display=%s identity_keys=%s" % [
+		clean_host,
+		port_value,
+		String(secure_payload.get("secretId", "")).strip_edges(),
+		_client_display_name,
+		str(_client_identity_payload.keys()),
+	])
 	var err := _client_peer.connect_to_url(url)
 	if err != OK:
 		var message := "连接房间失败：%s" % error_string(err)
+		_debug("connect_to_secure_qr failed url=%s error=%s" % [url, error_string(err)])
 		stop()
 		status_changed.emit(message)
 		return {"ok": false, "error": message}
+	_debug("connect_to_secure_qr connecting url=%s" % url)
 	status_changed.emit("正在连接房间：%s" % url)
 	return {"ok": true, "error": ""}
 
 
 func stop() -> void:
+	if _role != ROLE_NONE or _server != null or _client_peer != null or not _peers.is_empty():
+		_debug("stop role=%s peers=%d client_opened=%s join_completed=%s hello_sent=%s join_sent=%s" % [
+			_role,
+			_peers.size(),
+			str(_client_opened),
+			str(_client_join_completed),
+			str(_client_hello_sent),
+			str(_client_join_sent),
+		])
 	if _server != null:
 		_server.stop()
 	_server = null
@@ -234,6 +278,7 @@ func stop() -> void:
 	_client_room_id = ""
 	_client_join_token = ""
 	_client_display_name = ""
+	_client_identity_payload = {}
 	_client_as_observer = false
 	_client_expected_host_device_id = ""
 	_client_expected_host_public_key = ""
@@ -253,6 +298,7 @@ func stop() -> void:
 	_role = ROLE_NONE
 	_port = 0
 	_local_participant_id = ""
+	_client_last_ready_state = -1
 
 
 func peer_participant_id(peer_id: int) -> String:
@@ -299,10 +345,21 @@ func set_peer_participant(peer_id: int, participant_id: String, seat_index: int,
 		return
 	_close_duplicate_participant(peer_id, participant_id)
 	var data: Dictionary = _peers[peer_id]
+	var previous_participant := String(data.get("participant_id", "")).strip_edges()
+	var previous_seat := int(data.get("seat_index", -1))
+	var clean_display_name := display_name.strip_edges()
+	_debug("set_peer_participant peer=%d participant=%s seat=%d display=%s previous_participant=%s previous_seat=%d" % [
+		peer_id,
+		participant_id.strip_edges(),
+		seat_index,
+		clean_display_name,
+		previous_participant,
+		previous_seat,
+	])
 	data["participant_id"] = participant_id
 	data["seat_index"] = seat_index
-	if display_name.strip_edges() != "":
-		data["display_name"] = display_name.strip_edges()
+	if clean_display_name != "":
+		data["display_name"] = clean_display_name
 	_peers[peer_id] = data
 
 
@@ -352,10 +409,20 @@ func request_player_ready(ready: bool, seat_index: int = -1) -> bool:
 
 
 func request_switch_seat(seat_index: int) -> bool:
-	return send_client("switch_seat", {
+	var sent := send_client("switch_seat", {
 		"seatIndex": seat_index,
 		"seatNumber": seat_index + 1,
 	})
+	_debug("request_switch_seat seat=%d sent=%s role=%s client_opened=%s join_completed=%s participant=%s reconnect_participant=%s" % [
+		seat_index,
+		str(sent),
+		_role,
+		str(_client_opened),
+		str(_client_join_completed),
+		_local_participant_id,
+		_client_reconnect_participant_id,
+	])
+	return sent
 
 
 func request_switch_to_observer() -> bool:
@@ -383,12 +450,32 @@ func request_add_bot(seat_index: int, display_name: String) -> bool:
 	return request_add_controlled_player(seat_index, display_name)
 
 
-func request_add_controlled_player(seat_index: int, display_name: String) -> bool:
-	return send_client("add_controlled_player", {
+func request_add_controlled_player(seat_index: int, display_name: String, identity_payload: Dictionary = {}) -> bool:
+	var payload := _public_identity_payload(identity_payload)
+	payload.merge({
 		"seatIndex": seat_index,
 		"seatNumber": seat_index + 1,
 		"displayName": display_name.strip_edges(),
-	})
+	}, true)
+	return send_client("add_controlled_player", payload)
+
+
+func _public_identity_payload(identity_payload: Dictionary) -> Dictionary:
+	var result := {}
+	var avatar_id := String(identity_payload.get("avatarId", identity_payload.get("avatar_id", ""))).strip_edges()
+	if avatar_id != "":
+		result["avatarId"] = avatar_id
+	var avatar := String(identity_payload.get("avatar", identity_payload.get("avatarPath", identity_payload.get("avatar_path", "")))).strip_edges()
+	if avatar != "":
+		result["avatar"] = avatar
+	var voice_config_id := String(identity_payload.get("voiceConfigId", identity_payload.get("voice_config_id", identity_payload.get("playbackVoiceConfigId", identity_payload.get("playback_voice_config_id", ""))))).strip_edges()
+	if voice_config_id != "":
+		result["voiceConfigId"] = voice_config_id
+		result["playbackVoiceConfigId"] = voice_config_id
+	var voice_name := String(identity_payload.get("voiceName", identity_payload.get("voice_name", identity_payload.get("voice", "")))).strip_edges()
+	if voice_name != "":
+		result["voiceName"] = voice_name
+	return result
 
 
 func request_remove_bot(seat_index: int) -> bool:
@@ -448,11 +535,17 @@ func _poll_host() -> void:
 			"device_id": "",
 			"public_key": "",
 		}
+		_debug("host peer accepted peer=%d total_peers=%d" % [peer_id, _peers.size()])
 	var disconnected := []
 	for peer_id in _peers.keys():
 		var data: Dictionary = _peers[peer_id]
 		var peer := data.get("peer") as WebSocketPeer
 		if peer == null:
+			_debug("host peer missing peer=%d participant=%s seat=%d" % [
+				int(peer_id),
+				String(data.get("participant_id", "")).strip_edges(),
+				int(data.get("seat_index", -1)),
+			])
 			disconnected.append(peer_id)
 			continue
 		peer.poll()
@@ -461,8 +554,19 @@ func _poll_host() -> void:
 			if not bool(data.get("opened", false)):
 				data["opened"] = true
 				_peers[peer_id] = data
+				_debug("host peer opened peer=%d participant=%s seat=%d" % [
+					int(peer_id),
+					String(data.get("participant_id", "")).strip_edges(),
+					int(data.get("seat_index", -1)),
+				])
 			_read_host_packets(int(peer_id), peer)
 		elif state == WebSocketPeer.STATE_CLOSED:
+			_debug("host peer closed peer=%d participant=%s seat=%d opened=%s" % [
+				int(peer_id),
+				String(data.get("participant_id", "")).strip_edges(),
+				int(data.get("seat_index", -1)),
+				str(bool(data.get("opened", false))),
+			])
 			disconnected.append(peer_id)
 	for peer_id in disconnected:
 		peer_disconnected.emit(int(peer_id))
@@ -477,6 +581,19 @@ func _poll_client() -> void:
 		return
 	_client_peer.poll()
 	var state := _client_peer.get_ready_state()
+	if state != _client_last_ready_state:
+		_debug("client state %d -> %d opened=%s join_completed=%s hello_sent=%s join_sent=%s reconnect_participant=%s reconnect_token=%s secure_qr=%s" % [
+			_client_last_ready_state,
+			state,
+			str(_client_opened),
+			str(_client_join_completed),
+			str(_client_hello_sent),
+			str(_client_join_sent),
+			_client_reconnect_participant_id,
+			str(_client_reconnect_token != ""),
+			str(not _client_secure_qr_payload.is_empty()),
+		])
+		_client_last_ready_state = state
 	if state == WebSocketPeer.STATE_OPEN:
 		if not _client_opened:
 			_client_opened = true
@@ -491,13 +608,24 @@ func _poll_client() -> void:
 		_read_client_packets()
 	elif state == WebSocketPeer.STATE_CLOSED:
 		if not _client_join_completed:
+			_debug("client closed before join opened=%s join_sent=%s reconnect_participant=%s secure_qr=%s" % [
+				str(_client_opened),
+				str(_client_join_sent),
+				_client_reconnect_participant_id,
+				str(not _client_secure_qr_payload.is_empty()),
+			])
 			var message := "网络连接失败，请确认双方在同一局域网且房主在线"
 			if _client_opened:
 				message = "房间连接已断开"
 			_reject_client_join(message)
 		else:
-			_client_opened = false
-			status_changed.emit("房间连接已断开")
+			if _client_opened:
+				_client_opened = false
+				_debug("client closed after join participant=%s reconnect_participant=%s" % [
+					_local_participant_id,
+					_client_reconnect_participant_id,
+				])
+				status_changed.emit("房间连接已断开")
 
 
 func _read_host_packets(peer_id: int, peer: WebSocketPeer) -> void:
@@ -510,6 +638,13 @@ func _read_host_packets(peer_id: int, peer: WebSocketPeer) -> void:
 		var type := String(decoded.get("type", ""))
 		var message_id := String(decoded.get("messageId", ""))
 		var payload: Dictionary = decoded.get("payload", {})
+		if ["hello", "qr_secret_request", "join_room", "join_room_as_observer", "reconnect_room", "switch_seat", "switch_to_observer"].has(type):
+			_debug("host packet type=%s peer=%d message=%s payload_keys=%s" % [
+				type,
+				peer_id,
+				message_id,
+				str(payload.keys()),
+			])
 		if type == "hello":
 			_handle_client_hello(peer_id, message_id, payload)
 		elif ["qr_secret_request", "join_room", "join_room_as_observer", "reconnect_room"].has(type) and not _authenticate_peer_payload(peer_id, message_id, payload):
@@ -530,6 +665,12 @@ func _read_client_packets() -> void:
 		var type := String(decoded.get("type", ""))
 		var message_id := String(decoded.get("messageId", ""))
 		var payload: Dictionary = decoded.get("payload", {})
+		if ["join_accepted", "join_rejected", "hello_ack", "qr_secret_response", "action_rejected"].has(type):
+			_debug("client packet type=%s message=%s payload_keys=%s" % [
+				type,
+				message_id,
+				str(payload.keys()),
+			])
 		if type == "join_accepted":
 			_client_join_completed = true
 			_local_participant_id = String(payload.get("participantId", _local_participant_id))
@@ -634,6 +775,10 @@ func _send_pending_join_request() -> void:
 			_reject_client_join("二维码密钥协商初始化失败")
 			return
 		status_changed.emit("正在协商二维码密钥")
+		_debug("client request qr_secret secret_id=%s public_key_ready=%s" % [
+			String(_client_secure_qr_payload.get("secretId", "")).strip_edges(),
+			str(public_key.strip_edges() != ""),
+		])
 		send_client("qr_secret_request", {
 			"secretId": String(_client_secure_qr_payload.get("secretId", "")),
 			"publicKey": public_key,
@@ -642,6 +787,13 @@ func _send_pending_join_request() -> void:
 		return
 	_client_join_sent = true
 	if _client_reconnect_participant_id != "" and _client_reconnect_token != "":
+		_debug("client send reconnect_room room=%s participant=%s observer=%s expected_host_device=%s expected_host_public=%s" % [
+			_client_room_id,
+			_client_reconnect_participant_id,
+			str(_client_as_observer),
+			str(_client_expected_host_device_id != ""),
+			str(_client_expected_host_public_key != ""),
+		])
 		send_client("reconnect_room", {
 			"roomId": _client_room_id,
 			"participantId": _client_reconnect_participant_id,
@@ -649,18 +801,29 @@ func _send_pending_join_request() -> void:
 			"auth": _auth_payload(),
 		})
 	else:
-		send_client("join_room_as_observer" if _client_as_observer else "join_room", {
+		var payload := _public_identity_payload(_client_identity_payload)
+		payload.merge({
 			"roomId": _client_room_id,
 			"displayName": _client_display_name,
 			"joinToken": _client_join_token,
 			"auth": _auth_payload(),
-		})
+		}, true)
+		_debug("client send join_room type=%s room=%s observer=%s join_token=%s display=%s payload_keys=%s" % [
+			"join_room_as_observer" if _client_as_observer else "join_room",
+			_client_room_id,
+			str(_client_as_observer),
+			str(_client_join_token != ""),
+			_client_display_name,
+			str(payload.keys()),
+		])
+		send_client("join_room_as_observer" if _client_as_observer else "join_room", payload)
 
 
 func _handle_qr_secret_response(payload: Dictionary) -> void:
 	if _client_secure_qr_payload.is_empty() or _client_qr_secret_resolved:
 		return
 	if not bool(payload.get("ok", false)):
+		_debug("client qr_secret_response failed message=%s" % String(payload.get("message", "二维码密钥协商失败")))
 		_reject_client_join(String(payload.get("message", "二维码密钥协商失败")))
 		return
 	if _client_qr_private_key == null:
@@ -702,6 +865,12 @@ func _handle_qr_secret_response(payload: Dictionary) -> void:
 	_client_expected_host_device_id = decrypted_host_device_id
 	_client_expected_host_public_key = decrypted_host_public_key
 	_client_qr_secret_resolved = true
+	_debug("client qr_secret_response ok room=%s protocol=%d host_device=%s host_public=%s" % [
+		_client_room_id,
+		protocol_version,
+		str(_client_expected_host_device_id != ""),
+		str(_client_expected_host_public_key != ""),
+	])
 	status_changed.emit("二维码解密完成，正在加入房间")
 	_send_pending_join_request()
 
@@ -711,6 +880,7 @@ func _handle_client_hello(peer_id: int, message_id: String, payload: Dictionary)
 		return
 	var client_challenge := String(payload.get("clientChallenge", "")).strip_edges()
 	if client_challenge == "":
+		_debug("host hello rejected peer=%d reason=missing_client_challenge" % peer_id)
 		send_to_peer(peer_id, "action_rejected", {
 			"code": "invalid_auth_challenge",
 			"message": "缺少客户端认证挑战",
@@ -724,6 +894,11 @@ func _handle_client_hello(peer_id: int, message_id: String, payload: Dictionary)
 		data["device_id"] = String((device_value as Dictionary).get("deviceId", "")).strip_edges()
 		data["public_key"] = String((device_value as Dictionary).get("publicKey", "")).strip_edges()
 	_peers[peer_id] = data
+	_debug("host hello peer=%d device_id=%s public_key_set=%s" % [
+		peer_id,
+		String(data.get("device_id", "")),
+		str(String(data.get("public_key", "")).strip_edges() != ""),
+	])
 	send_to_peer(peer_id, "hello_ack", {
 		"server": "godot",
 		"host": _public_identity(),
@@ -738,6 +913,7 @@ func _authenticate_peer_payload(peer_id: int, message_id: String, payload: Dicti
 	var data: Dictionary = _peers[peer_id]
 	var challenge := String(data.get("server_challenge", "")).strip_edges()
 	if challenge == "":
+		_debug("peer auth rejected peer=%d reason=no_server_challenge" % peer_id)
 		send_to_peer(peer_id, "join_rejected", {
 			"code": "auth_required",
 			"message": "请先完成设备认证",
@@ -745,6 +921,7 @@ func _authenticate_peer_payload(peer_id: int, message_id: String, payload: Dicti
 		return false
 	var auth_value = payload.get("auth", {})
 	if not (auth_value is Dictionary):
+		_debug("peer auth rejected peer=%d reason=missing_auth" % peer_id)
 		send_to_peer(peer_id, "join_rejected", {
 			"code": "auth_required",
 			"message": "缺少设备认证签名",
@@ -752,6 +929,7 @@ func _authenticate_peer_payload(peer_id: int, message_id: String, payload: Dicti
 		return false
 	var auth: Dictionary = auth_value
 	if not DeviceIdentityScript.verify_auth_payload(auth, challenge):
+		_debug("peer auth rejected peer=%d reason=invalid_signature" % peer_id)
 		send_to_peer(peer_id, "join_rejected", {
 			"code": "invalid_auth_signature",
 			"message": "设备认证签名无效",
@@ -760,9 +938,15 @@ func _authenticate_peer_payload(peer_id: int, message_id: String, payload: Dicti
 	data["device_id"] = String(auth.get("deviceId", "")).strip_edges()
 	data["public_key"] = String(auth.get("publicKey", "")).strip_edges()
 	_peers[peer_id] = data
+	_debug("peer auth ok peer=%d device_id=%s public_key_set=%s" % [
+		peer_id,
+		String(data.get("device_id", "")),
+		str(String(data.get("public_key", "")).strip_edges() != ""),
+	])
 	return true
 
 func _reject_client_identity(message: String) -> void:
+	_debug("client identity rejected message=%s" % message)
 	_reject_client_join(message)
 
 
@@ -770,6 +954,7 @@ func _reject_client_join(message: String) -> void:
 	if _client_join_completed:
 		return
 	_client_join_completed = true
+	_debug("client join rejected message=%s" % message)
 	status_changed.emit(message)
 	join_rejected.emit(message)
 	if _client_peer != null:
@@ -792,6 +977,12 @@ func _close_duplicate_participant(current_peer_id: int, participant_id: String) 
 		var peer := data.get("peer") as WebSocketPeer
 		if peer != null:
 			peer.close()
+		_debug("close_duplicate_participant participant=%s current_peer=%d duplicate_peer=%d duplicate_seat=%d" % [
+			clean,
+			current_peer_id,
+			peer_id,
+			int(data.get("seat_index", -1)),
+		])
 		_peers.erase(peer_id)
 
 

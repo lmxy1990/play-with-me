@@ -4,6 +4,8 @@ extends RefCounted
 const TASK_TYPE_ACTION := "player_action"
 const TASK_TYPE_SPEECH := "player_speech"
 const ACTION_DESTROY_SHERIFF_BADGE := "sheriff_badge_destroy"
+const ACTION_SKIP := "skip"
+const ACTION_WITCH_SKIP := "witch_skip"
 
 
 func action_prompt_state(task: Dictionary, task_frame: Dictionary = {}, current_label: String = "", current_icon: String = "", actor_title: String = "") -> Dictionary:
@@ -52,7 +54,7 @@ func action_result_payload(target_index: int, action_name: String = "") -> Dicti
 	}
 	if clean_action != "":
 		payload["action"] = clean_action
-	if clean_action == ACTION_DESTROY_SHERIFF_BADGE:
+	if clean_action in [ACTION_DESTROY_SHERIFF_BADGE, ACTION_SKIP, ACTION_WITCH_SKIP]:
 		payload["targetIndex"] = -1
 		payload["targetSeatNumber"] = -1
 	return payload

@@ -474,7 +474,7 @@ func _debug_center_speech_row(entry: Dictionary) -> Dictionary:
 	var seat := String(entry.get("seat", _history_item_seat_text(entry))).strip_edges()
 	var name := String(entry.get("name", _history_item_display_name(entry))).strip_edges()
 	var full_text := _center_speech_display_text(entry)
-	var visible_text := _center_speech_visible_text(entry) if entry.has("progress") else full_text
+	var visible_text := full_text
 	var title := _debug_render_title(seat, name, speaker)
 	return {
 		"seat": seat,

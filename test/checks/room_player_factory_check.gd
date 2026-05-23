@@ -19,6 +19,20 @@ func _initialize() -> void:
 	assert(String(self_player.get("owner", "")) == "self")
 	assert(factory.visible_role_for_player(self_player) == "未知")
 
+	var named_self: Dictionary = factory.self_player_from_identity("host", {
+		"nickname": "阿景",
+		"avatarId": "avatar_fox",
+		"avatar": "res://custom/avatar.png",
+		"playbackVoiceConfigId": "voice_custom",
+	}, [
+		{"name": "阿景", "owner": "human"},
+	], -1, 0)
+	assert(String(named_self.get("name", "")) == "阿景 2")
+	assert(String(named_self.get("avatar", "")) == "res://custom/avatar.png")
+	assert(String(named_self.get("base_avatar", "")) == "res://custom/avatar.png")
+	assert(String(named_self.get("avatarId", "")) == "avatar_fox")
+	assert(String(named_self.get("playbackVoiceConfigId", "")) == "voice_custom")
+
 	var human: Dictionary = factory.human_player("peer_a", "玩家A", 0)
 	human["role"] = "狼人"
 	human["role_key"] = "wolf"
@@ -52,4 +66,18 @@ func _initialize() -> void:
 	assert(String(bot_b.get("participant_id", "")) == "")
 	assert(String(bot_b.get("controller_participant_id", "")) == "peer_a")
 	assert(factory.visible_role_for_player(bot_b) == "未知")
+
+	var named_bot: Dictionary = factory.bot_player_from_profile(3, {
+		"name": "Alpha",
+		"avatar": "res://custom/bot.png",
+		"voice": "系统默认",
+	}, "host", [
+		{"name": "Alpha", "owner": "human"},
+		{"name": "Alpha 2", "owner": "human"},
+	], -1, 0)
+	assert(String(named_bot.get("name", "")) == "Alpha 3")
+	assert(String(named_bot.get("avatar", "")) == "res://custom/bot.png")
+	assert(String(named_bot.get("base_avatar", "")) == "res://custom/bot.png")
+	assert(String(named_bot.get("voice", "")) == "系统默认")
+	assert(String(named_bot.get("voiceName", "")) == "系统默认")
 	quit()

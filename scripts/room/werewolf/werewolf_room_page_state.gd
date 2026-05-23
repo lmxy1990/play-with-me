@@ -143,6 +143,20 @@ func _player_title(index: int) -> String:
 	return "主持人"
 
 
+func _current_viewer_participant_id() -> String:
+	var participant_id := _current_network_participant_id()
+	if participant_id != "":
+		return participant_id
+	if _local_player_index >= 0 and _local_player_index < _players.size() and _players[_local_player_index] is Dictionary:
+		var player: Dictionary = _players[_local_player_index]
+		var player_participant_id := String(player.get("participant_id", player.get("participantId", ""))).strip_edges()
+		if player_participant_id != "":
+			return player_participant_id
+		if String(player.get("owner", "")) == "self":
+			return "host"
+	return participant_id
+
+
 func _visible_history_for_current_participant() -> Array:
 	var result := []
 	for item in _history:
@@ -152,7 +166,35 @@ func _visible_history_for_current_participant() -> Array:
 
 
 func _history_item_visible_to_current(item: Dictionary) -> bool:
-	return _history_item_visible_to_participant(item, _current_network_participant_id())
+	return _history_item_visible_to_participant(item, _current_viewer_participant_id())
+
+
+func _seat_state_visible_to_current(index: int) -> bool:
+	if index < 0 or index >= _players.size() or not (_players[index] is Dictionary):
+		return true
+	if not _engine.is_night_phase(_werewolf) or _is_post_game_phase():
+		return true
+	if _is_observer_participant(_current_viewer_participant_id()):
+		return true
+	if index == _local_player_index:
+		return true
+	var phase := String(_werewolf.get("phase", ""))
+	if phase == "wolf_chat":
+		return _current_viewer_can_see_wolf_private()
+	var action: Dictionary = _werewolf.get("current_action", {}) if _werewolf.get("current_action", {}) is Dictionary else {}
+	if int(action.get("actor_index", -1)) == index:
+		var action_key := String(action.get("key", "")).strip_edges()
+		if action_key == "wolf_kill":
+			return _current_viewer_can_see_wolf_private()
+		if action_key in ["witch_act", "witch_save", "witch_poison", "witch_skip", "seer_check", "guard_protect"]:
+			return false
+	return true
+
+
+func _current_viewer_can_see_wolf_private() -> bool:
+	if _local_player_index < 0 or _local_player_index >= _players.size() or not (_players[_local_player_index] is Dictionary):
+		return false
+	return _role_catalog.can_join_wolf_chat(String((_players[_local_player_index] as Dictionary).get("role_key", "")))
 
 
 func _history_item_visible_to_participant(item: Dictionary, participant_id: String) -> bool:
@@ -639,12 +681,12 @@ func _sanitize_device_task_payload(payload: Dictionary) -> void:
 
 
 func _device_task_private_payload_fields() -> Array:
-	return ["api_key", "apiKey", "endpoint", "provider", "model", "modelName", "model_name", "modelProfile", "model_profile", "modelConfig", "model_config", "messages", "requestOptions", "request_options", "response_schema", "responseSchema", "schema", "voice", "voiceName", "voice_name", "formt_adapter", "formtAdapter", "format_adapter", "formatAdapter", "output_adapter", "outputAdapter", "reason_adapter", "reasonAdapter", "reasoning_adapter", "reasoningAdapter", "temperature", "max_output", "maxOutput", "max_output_tokens", "maxOutputTokens", "max_context", "maxContext"]
+	return ["api_key", "apiKey", "endpoint", "provider", "model", "modelName", "model_name", "modelProfile", "model_profile", "modelConfig", "model_config", "messages", "requestOptions", "request_options", "response_schema", "responseSchema", "schema", "formt_adapter", "formtAdapter", "format_adapter", "formatAdapter", "output_adapter", "outputAdapter", "reason_adapter", "reasonAdapter", "reasoning_adapter", "reasoningAdapter", "temperature", "max_output", "maxOutput", "max_output_tokens", "maxOutputTokens", "max_context", "maxContext"]
 
 
 func _device_task_private_payload_key(key: String, lower_key: String = "") -> bool:
 	var lower := lower_key if lower_key != "" else key.to_lower()
-	return _device_task_private_payload_fields().has(key) or ["api_key", "apikey", "endpoint", "provider", "model", "modelname", "model_name", "modelprofile", "model_profile", "modelconfig", "model_config", "messages", "requestoptions", "request_options", "response_schema", "responseschema", "schema", "voice", "voicename", "voice_name", "formt_adapter", "formtadapter", "format_adapter", "formatadapter", "output_adapter", "outputadapter", "reason_adapter", "reasonadapter", "reasoning_adapter", "reasoningadapter", "temperature", "max_output", "maxoutput", "max_output_tokens", "maxoutputtokens", "max_context", "maxcontext"].has(lower)
+	return _device_task_private_payload_fields().has(key) or ["api_key", "apikey", "endpoint", "provider", "model", "modelname", "model_name", "modelprofile", "model_profile", "modelconfig", "model_config", "messages", "requestoptions", "request_options", "response_schema", "responseschema", "schema", "formt_adapter", "formtadapter", "format_adapter", "formatadapter", "output_adapter", "outputadapter", "reason_adapter", "reasonadapter", "reasoning_adapter", "reasoningadapter", "temperature", "max_output", "maxoutput", "max_output_tokens", "maxoutputtokens", "max_context", "maxcontext"].has(lower)
 
 
 func _sanitize_device_task_payload_in_place(value) -> void:
@@ -1015,6 +1057,11 @@ func _seat_card_data(index: int) -> Dictionary:
 	var seat_data := {}
 	if index >= 0 and index < _players.size() and _players[index] is Dictionary:
 		seat_data = (_players[index] as Dictionary).duplicate(true)
+	if not _seat_state_visible_to_current(index):
+		seat_data["motion"] = SeatMotion.IDLE
+		seat_data["speech_progress"] = 0.0
+		if String(seat_data.get("state", "")) in ["思考中", "发言中", "狼队夜聊", "等待狼队行动"]:
+			seat_data["state"] = "等待"
 	seat_data["tts_enabled"] = _player_tts_enabled(index)
 	var role_visible := _role_visible_for_current_view(index)
 	seat_data["role_visible"] = role_visible
@@ -1076,6 +1123,12 @@ func _avatar_badges_for_seat(index: int) -> Array:
 			"id": "sheriff",
 			"icon": _werewolf_action_path("badge_sheriff"),
 			"tooltip": "警徽",
+		})
+	if String(player.get("owner", "")).strip_edges() == "self":
+		badges.append({
+			"id": "self",
+			"icon": _werewolf_action_path("badge_self"),
+			"tooltip": "我的头像",
 		})
 	if index == _guarded_avatar_badge_index() and _can_view_guard_avatar_badge():
 		badges.append({
@@ -1163,20 +1216,35 @@ func _role_visible_for_current_view(index: int) -> bool:
 	var owner := String(player.get("owner", ""))
 	if owner == "":
 		return true
-	if not _is_game_started():
+	if not _is_game_started() or String(_werewolf.get("phase", "")) == "replay_round":
 		return true
 	if _is_observer_participant(_current_network_participant_id()):
 		return true
-	if not _is_network_client():
-		return true
 	if index == _local_player_index:
 		return true
-	return _role_publicly_revealed_for_player(player)
+	if _role_publicly_revealed_for_player(player):
+		return true
+	if _local_player_index >= 0 and _local_player_index < _players.size() and _players[_local_player_index] is Dictionary:
+		var viewer_role := String((_players[_local_player_index] as Dictionary).get("role_key", "")).strip_edges()
+		var target_role := String(player.get("role_key", "")).strip_edges()
+		return _role_catalog.can_see_wolf_teammates(viewer_role) and _role_catalog.is_wolf_team(target_role) and _role_catalog.visible_to_wolf_teammates(target_role)
+	return false
 
 
 func _role_publicly_revealed_for_player(player: Dictionary) -> bool:
 	return bool(player.get("idiot_revealed", false)) \
 		or bool(player.get("public_role_visible", false))
+
+
+func _first_auto_open_target_for_current_action() -> int:
+	var target := int(_engine.suggested_target_for_current_action(_werewolf, _players))
+	if target >= 0 and target < _players.size():
+		return target
+	var action: Dictionary = _werewolf.get("current_action", {}) if _werewolf.get("current_action", {}) is Dictionary else {}
+	var action_key := String(action.get("key", "")).strip_edges()
+	if action_key == "sheriff_badge_action":
+		return _pending_actor_index
+	return -1
 
 
 func _is_local_private_ai_seat(index: int) -> bool:

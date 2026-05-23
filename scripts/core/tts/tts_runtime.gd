@@ -97,6 +97,18 @@ func current_item() -> Dictionary:
 	return _current.duplicate(true)
 
 
+func skip_current() -> bool:
+	if _current.is_empty():
+		return false
+	if _native_active:
+		if _native_source == "android":
+			_android_tts_bridge.stop()
+		else:
+			DisplayServer.tts_stop()
+	_cancel_current("skipped")
+	return true
+
+
 func validate_item(item: Dictionary) -> Dictionary:
 	var engine := String(item.get("engine", "")).strip_edges()
 	var voice := String(item.get("voice", "")).strip_edges()

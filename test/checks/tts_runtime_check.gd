@@ -84,6 +84,41 @@ func _initialize() -> void:
 	assert(bool(flags["progress_seen"]))
 	assert(bool(flags["finished"]))
 
+	var skip_runtime = load("res://scripts/core/tts/tts_runtime.gd").new()
+	skip_runtime.simulate_in_headless = true
+	root.add_child(skip_runtime)
+	var skipped: Array = []
+	var skip_started: Array = []
+	skip_runtime.speech_started.connect(func(item: Dictionary) -> void:
+		skip_started.append(String(item.get("text", "")))
+	)
+	skip_runtime.speech_failed.connect(func(item: Dictionary, error: String) -> void:
+		skipped.append({"text": String(item.get("text", "")), "error": error})
+	)
+	skip_runtime.enqueue({
+		"speaker": "主持人",
+		"text": "第一条需要跳过。",
+		"engine": "system",
+		"voice": "manual_voice",
+		"speed": "1.00",
+		"pitch": "1.00",
+		"volume": "1.00",
+	})
+	skip_runtime.enqueue({
+		"speaker": "主持人",
+		"text": "第二条需要保留。",
+		"engine": "system",
+		"voice": "manual_voice",
+		"speed": "1.00",
+		"pitch": "1.00",
+		"volume": "1.00",
+	})
+	assert(skip_runtime.skip_current())
+	assert(skipped.size() == 1 and String((skipped[0] as Dictionary).get("error", "")) == "skipped")
+	assert(skip_runtime.is_speaking())
+	assert((skip_started as Array).has("第二条需要保留。"))
+	skip_runtime.queue_free()
+
 	var android_runtime = load("res://scripts/core/tts/tts_runtime.gd").new()
 	android_runtime.simulate_in_headless = true
 	root.add_child(android_runtime)

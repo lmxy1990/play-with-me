@@ -32,6 +32,7 @@ func _build_base() -> void:
 	_modal_layer = Control.new()
 	_modal_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_modal_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_modal_layer.z_index = 100
 	add_child(_modal_layer)
 
 
@@ -49,6 +50,7 @@ func _clear_scene() -> void:
 		call("_clear_center_speech_display")
 	_ready_button = null
 	_start_button = null
+	_pause_button = null
 	_observer_bar = null
 
 

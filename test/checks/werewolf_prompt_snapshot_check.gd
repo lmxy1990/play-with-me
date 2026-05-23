@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_assert_contract(runtime, builder.action_context(_witch_input(input), 3, "witch_act", {}), "女巫", true, "选择救人、毒人或跳过。")
 	_assert_contract(runtime, builder.action_context(input, 4, "guard_protect", {}), "守卫", true, "选择今晚守护目标。")
 	_assert_sheriff_campaign_contract(runtime, builder, input)
+	_assert_last_words_contract(runtime, builder, input)
 	_assert_current_questions_are_simple(builder, input)
 
 	quit()
@@ -47,6 +48,7 @@ func _assert_contract(runtime, context: Dictionary, role_label: String, expects_
 	else:
 		assert(system_content.contains("直接返回发言文本"))
 		assert(system_content.contains("建议回复在120字以内"))
+		assert(system_content.contains("发言原则：结合你当前身份、当前阶段和可见信息发言，优先说符合自身身份利益的话；可以伪装、试探、误导，也可以按策略故意暴露。"))
 	assert(not system_content.contains("只输出 JSON"))
 	assert(not system_content.contains("outputFormat"))
 	assert(not system_content.contains("confidence"))
@@ -102,13 +104,26 @@ func _assert_sheriff_campaign_contract(runtime, builder, input: Dictionary) -> v
 	assert(not system_content.contains("你目前没有查验结果"))
 	assert(not system_content.contains("私有底牌"))
 	assert(not system_content.contains("[游戏上下文]"))
-	assert(not system_content.contains("[公开发言边界]"))
-	assert(not system_content.contains("[警长竞选边界]"))
+	assert(system_content.contains("发言原则：结合你当前身份、当前阶段和可见信息发言，优先说符合自身身份利益的话；可以伪装、试探、误导，也可以按策略故意暴露。"))
 	assert(question == "发表警长竞选发言。")
 	assert(user_content.begins_with("{"))
 	assert(String(payload.get("current_state", "")).contains("首夜前"))
 	assert(String(payload.get("current_state", "")).contains("无夜间技能结果"))
 	assert(not payload.has("facts"))
+
+
+func _assert_last_words_contract(runtime, builder, input: Dictionary) -> void:
+	var speech_messages: Array = runtime.build_messages(builder.speech_context(input, 0, {}))
+	var speech_system := String((speech_messages[0] as Dictionary).get("content", ""))
+	assert(not speech_system.contains("遗言是全局可见的。"))
+
+	var last_words_input: Dictionary = input.duplicate(true)
+	(last_words_input["werewolf"] as Dictionary)["phase"] = "last_words"
+	var context: Dictionary = builder.speech_context(last_words_input, 0, {})
+	var messages: Array = runtime.build_messages(context)
+	var system_content := String((messages[0] as Dictionary).get("content", ""))
+	assert(String(context.get("current_question", "")) == "发表遗言。")
+	assert(system_content.contains("遗言是全局可见的。"))
 
 
 func _assert_current_questions_are_simple(builder, input: Dictionary) -> void:

@@ -63,15 +63,17 @@ func _switch_local_to_observer() -> void:
 	var index := _seat_for_participant_id(participant_id)
 	var display_name := _local_nickname
 	var auth := _device_identity.auth_payload()
+	var identity := _preference_identity_snapshot()
 	if index >= 0 and index < _players.size():
 		var player: Dictionary = _players[index]
 		display_name = String(player.get("name", _local_nickname))
+		identity = player.duplicate(true)
 		auth = {
 			"deviceId": String(player.get("device_id", _device_identity.device_id)),
 			"publicKey": String(player.get("public_key", _device_identity.public_key)),
 		}
 		_players[index] = _empty_seat_data(index)
-	_register_observer(_active_room(), participant_id, display_name, auth)
+	_register_observer(_active_room(), participant_id, display_name, auth, identity)
 	_local_player_index = -1
 	_system_message = "%s 切换为观战" % display_name
 	_show_room_system_message_toast()
@@ -196,6 +198,8 @@ func _history_avatar_control(item: Dictionary, size_px: int) -> Control:
 	avatar.ring_color = Color(0.96, 0.70, 0.32, 0.72)
 	avatar.shadow_color = Color(0, 0, 0, 0.16)
 	avatar.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	if has_method("_wire_player_avatar_detail"):
+		call("_wire_player_avatar_detail", avatar, _history_item_speaker_index(item))
 	return avatar
 
 
@@ -217,10 +221,12 @@ func _history_chat_bubble(item: Dictionary, mine: bool) -> PanelContainer:
 	var meta := "%s %s" % [seat, name] if seat != "" else name
 	var meta_label := _nowrap_label(meta, 11, GOLD if not mine else Color(0.92, 0.80, 0.52), true)
 	meta_label.name = "HistoryChatMetaLabel"
+	_force_ltr_label(meta_label)
 	body.add_child(meta_label)
 	var display_text := _center_speech_display_text(item) if has_method("_center_speech_display_text") else String(item.get("text", ""))
 	var content := _label(display_text, 12, INK, false)
 	content.name = "HistoryChatContentLabel"
+	_force_ltr_label(content)
 	content.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	content.clip_text = false

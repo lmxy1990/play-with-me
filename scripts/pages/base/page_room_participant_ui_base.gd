@@ -21,8 +21,8 @@ func _ensure_network_reconnect_token(room: Dictionary, participant_id: String) -
 	return _room_participant_registry.ensure_reconnect_token(room, participant_id)
 
 
-func _register_observer(room: Dictionary, participant_id: String, display_name: String, auth: Dictionary) -> void:
-	_room_participant_registry.register_observer(room, participant_id, display_name, auth)
+func _register_observer(room: Dictionary, participant_id: String, display_name: String, auth: Dictionary, identity: Dictionary = {}) -> void:
+	_room_participant_registry.register_observer(room, participant_id, display_name, auth, identity)
 
 
 func _observer_for_participant(room: Dictionary, participant_id: String) -> Dictionary:

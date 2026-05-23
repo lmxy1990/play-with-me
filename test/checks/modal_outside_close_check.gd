@@ -18,6 +18,7 @@ func _initialize() -> void:
 	await process_frame
 	if not _expect(_modal_has_outside_close(room), "overlay dialog has outside close area"):
 		return
+	await create_timer(0.35).timeout
 	_click_backdrop(room)
 	await process_frame
 	if not _expect(room._modal_layer.get_child_count() == 0, "overlay dialog closes on outside click"):
@@ -33,6 +34,8 @@ func _initialize() -> void:
 	var seat_bubble := room._modal_layer.find_child("SeatBubbleAction", true, false) as Control
 	if not _expect(seat_bubble != null, "seat bubble action is shown"):
 		return
+	if not _expect(_seat_bubbles_are_above_seat(room, 1), "seat bubble actions are above the selected seat"):
+		return
 	room.call("_input", _mouse_click(seat_bubble.global_position + seat_bubble.size * 0.5))
 	await process_frame
 	if not _expect(room._modal_layer.get_child_count() > 0, "clicking inside seat bubble keeps it open"):
@@ -41,6 +44,24 @@ func _initialize() -> void:
 	await process_frame
 	if not _expect(room._modal_layer.get_child_count() == 0, "seat bubble closes on outside click"):
 		return
+
+	var occupied_seat := room._seat_cards[0] as Control
+	room.call("_input", _mouse_click(occupied_seat.global_position + occupied_seat.size * 0.5))
+	occupied_seat.call("_on_gui_input", _mouse_click(occupied_seat.size * 0.5))
+	await process_frame
+	if not _expect(room._modal_layer.find_child("SeatDetailOverlay", true, false) != null, "clicking a player avatar opens seat detail"):
+		return
+	_click_backdrop(room)
+	await process_frame
+	if not _expect(room._modal_layer.find_child("SeatDetailOverlay", true, false) != null, "newly opened seat detail ignores the opening tap tail"):
+		return
+	await create_timer(0.35).timeout
+	_click_backdrop(room)
+	await process_frame
+	if not _expect(room._modal_layer.get_child_count() == 0, "seat detail closes on outside click after open guard"):
+		return
+	room._clear_modal()
+	await process_frame
 
 	room._open_empty_seat_actions(1)
 	await process_frame
@@ -88,6 +109,32 @@ func _click_backdrop(room: Control) -> void:
 	if backdrop == null:
 		return
 	backdrop.emit_signal("gui_input", _mouse_click(Vector2(1, 1)))
+
+
+func _seat_bubbles_are_above_seat(room: Control, seat_index: int) -> bool:
+	if seat_index < 0 or seat_index >= room._seat_cards.size():
+		return false
+	var seat := room._seat_cards[seat_index] as Control
+	if seat == null:
+		return false
+	var bubbles: Array = _seat_bubble_actions(room)
+	if bubbles.size() < 2:
+		return false
+	for value in bubbles:
+		if not (value is Control):
+			return false
+		var bubble := value as Control
+		if bubble.global_position.y + bubble.size.y > seat.global_position.y:
+			return false
+	return true
+
+
+func _seat_bubble_actions(room: Control) -> Array:
+	var result := []
+	for child in room._modal_layer.get_children():
+		if child is Control and bool((child as Control).get_meta("seat_bubble", false)):
+			result.append(child)
+	return result
 
 
 func _mouse_click(position: Vector2) -> InputEventMouseButton:

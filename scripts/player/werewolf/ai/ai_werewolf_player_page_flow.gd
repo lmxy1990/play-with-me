@@ -5,6 +5,7 @@ const WerewolfHumanPlayerTaskControllerScript := preload("res://scripts/player/w
 const WerewolfBotRuntimeScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_player_runtime.gd")
 const WerewolfMemoryScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_memory.gd")
 const WerewolfMemoryContextScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_memory_context.gd")
+const PromptPolicyScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_prompt_policy.gd")
 const WerewolfWolfPrivateFlowScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_wolf_private_flow.gd")
 const WerewolfTurnContextBuilderScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_turn_context_builder.gd")
 
@@ -1190,6 +1191,22 @@ func _on_player_action_device_task(task: Dictionary) -> void:
 	if has_method("_show_room_system_message_toast"):
 		call("_show_room_system_message_toast")
 	_refresh_center_panel()
+	if _can_local_control_index(_pending_actor_index) and has_method("_open_target_confirm"):
+		var target := _first_auto_open_target_for_current_action()
+		if target >= 0:
+			call("_open_target_confirm", target)
+			_bot_debug("[WerewolfDeviceTask][debug] auto_open_action id=%s actor=%s target=%d action=%s" % [
+				String(task.get("id", task.get("task_id", ""))),
+				_player_title(_pending_actor_index),
+				target + 1,
+				_pending_action,
+			])
+		else:
+			_bot_debug("[WerewolfDeviceTask][debug] auto_open_action skipped id=%s actor=%s reason=no_target action=%s" % [
+				String(task.get("id", task.get("task_id", ""))),
+				_player_title(_pending_actor_index),
+				_pending_action,
+			])
 
 
 func _on_player_speech_device_task(task: Dictionary) -> void:
@@ -1399,6 +1416,9 @@ func _reset_werewolf_bot_prompt_logs() -> void:
 
 
 func _reset_werewolf_session_memories(map_id: String = "") -> void:
+	if not bool(PromptPolicyScript.write_memory_enabled):
+		_bot_debug("[BotMemory][debug] reset skipped reason=write_disabled")
+		return
 	_ensure_memory_loaded()
 	for i in range(_players.size()):
 		if not _is_bot_actor(i):
@@ -1603,6 +1623,8 @@ func _memory_system_summary(memory_payload: Dictionary) -> String:
 
 
 func _record_bot_observation(player_index: int) -> void:
+	if not bool(PromptPolicyScript.write_memory_enabled):
+		return
 	if not _is_bot_actor(player_index):
 		return
 	var visible_events := _recent_timeline_events_for_viewer(8, player_index)
@@ -1611,6 +1633,8 @@ func _record_bot_observation(player_index: int) -> void:
 
 
 func _record_bot_speech(player_index: int, text: String) -> void:
+	if not bool(PromptPolicyScript.write_memory_enabled):
+		return
 	if not _is_bot_actor(player_index):
 		return
 	var entry := _werewolf_memory_builder.speech_entry(player_index, _players, text)
@@ -1618,6 +1642,8 @@ func _record_bot_speech(player_index: int, text: String) -> void:
 
 
 func _record_bot_decision(player_index: int, target_index: int, action_key: String) -> void:
+	if not bool(PromptPolicyScript.write_memory_enabled):
+		return
 	if not _is_bot_actor(player_index):
 		return
 	var entry := _werewolf_memory_builder.decision_entry(player_index, target_index, action_key, _players)
@@ -1625,6 +1651,8 @@ func _record_bot_decision(player_index: int, target_index: int, action_key: Stri
 
 
 func _append_player_memory(player_index: int, entry: Dictionary) -> void:
+	if not bool(PromptPolicyScript.write_memory_enabled):
+		return
 	if player_index < 0 or player_index >= _players.size():
 		_bot_debug("[BotMemory][debug] append ignored invalid_index=%d players=%d" % [player_index, _players.size()])
 		return
@@ -1686,6 +1714,10 @@ func _save_long_term_memories_if_completed() -> void:
 	if String(_werewolf.get("phase", "")) != "completed":
 		return
 	if bool(_werewolf.get("memory_long_term_saved", false)):
+		return
+	if not bool(PromptPolicyScript.write_memory_enabled):
+		_werewolf["memory_long_term_saved"] = true
+		_bot_debug("[BotMemory][debug] long_term skipped reason=write_disabled")
 		return
 	_ensure_memory_loaded()
 	var compact := _werewolf_memory_builder.compact_request(_werewolf, _players, _history, "completed")

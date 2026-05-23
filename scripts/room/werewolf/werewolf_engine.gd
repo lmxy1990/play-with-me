@@ -162,7 +162,7 @@ func apply_target(state: Dictionary, players: Array, target_index: int, local_in
 	if action_key == "sheriff_badge_action":
 		badge_choice = _sheriff_badge_action_from_choice(action_choice)
 	if not (action_key == "sheriff_badge_action" and badge_choice == "destroy"):
-		var validation: Dictionary = _validate_target(next_state, next_players, actor_index, target_index, action_key)
+		var validation: Dictionary = _validate_target(next_state, next_players, actor_index, target_index, action_key, action_choice)
 		if not bool(validation.get("ok", false)):
 			return validation
 
@@ -203,7 +203,7 @@ func apply_target(state: Dictionary, players: Array, target_index: int, local_in
 			next_state["phase"] = "witch_action"
 			message = "查验完成"
 		"witch_act":
-			var witch_result: Dictionary = _apply_witch_action(next_state, next_players, actor_index, target_index)
+			var witch_result: Dictionary = _apply_witch_action(next_state, next_players, actor_index, target_index, action_choice)
 			if not bool(witch_result.get("ok", false)):
 				return witch_result
 			history.append_array(witch_result["history"])
@@ -800,17 +800,18 @@ func _advance_auto(state: Dictionary, players: Array) -> Dictionary:
 	}
 
 
-func _apply_witch_action(state: Dictionary, players: Array, actor_index: int, target_index: int) -> Dictionary:
+func _apply_witch_action(state: Dictionary, players: Array, actor_index: int, target_index: int, action_choice: String = "") -> Dictionary:
 	var night: Dictionary = _as_dict(state.get("night", {}))
 	var wolf_target: int = int(night.get("wolf_target_index", -1))
 	var history: Array = []
-	if target_index == wolf_target and bool(state.get("witch_antidote", true)):
+	var witch_choice := _witch_action_from_choice(action_choice)
+	if (witch_choice == "save" or witch_choice == "") and target_index == wolf_target and bool(state.get("witch_antidote", true)):
 		night["witch_saved"] = true
 		state["witch_antidote"] = false
 		state["night"] = night
 		history.append(_actor_history(players, actor_index, "我使用解药救 %s。" % _player_title(players, target_index), "private", target_index, "witch_act"))
 		return {"ok": true, "history": history}
-	if bool(state.get("witch_poison", true)):
+	if (witch_choice == "poison" or witch_choice == "") and bool(state.get("witch_poison", true)):
 		night["witch_poison_target_index"] = target_index
 		state["witch_poison"] = false
 		state["night"] = night
@@ -1268,6 +1269,17 @@ func _sheriff_badge_action_from_choice(action_choice: String) -> String:
 			return ""
 
 
+func _witch_action_from_choice(action_choice: String) -> String:
+	var choice := action_choice.strip_edges().to_lower()
+	match choice:
+		"witch_save", "save", "antidote", "heal", "用药", "解药":
+			return "save"
+		"witch_poison", "poison", "toxin", "用毒", "毒药":
+			return "poison"
+		_:
+			return ""
+
+
 func _speech_order_titles(players: Array, order: Array) -> String:
 	var parts: Array = []
 	for item in order:
@@ -1330,7 +1342,7 @@ func _check_win(state: Dictionary, players: Array) -> Dictionary:
 	return _win_conditions.check(check_state, players)
 
 
-func _validate_target(state: Dictionary, players: Array, actor_index: int, target_index: int, action_key: String) -> Dictionary:
+func _validate_target(state: Dictionary, players: Array, actor_index: int, target_index: int, action_key: String, action_choice: String = "") -> Dictionary:
 	if action_key == "mvp_vote":
 		if not _is_occupied(players, actor_index):
 			return _error("行动玩家不存在")
@@ -1383,6 +1395,19 @@ func _validate_target(state: Dictionary, players: Array, actor_index: int, targe
 				return _error("女巫只能在夜晚行动")
 			var night: Dictionary = _as_dict(state.get("night", {}))
 			var wolf_target: int = int(night.get("wolf_target_index", -1))
+			var witch_choice := _witch_action_from_choice(action_choice)
+			if witch_choice == "save":
+				if not bool(state.get("witch_antidote", true)):
+					return _error("女巫已无解药")
+				if target_index != wolf_target:
+					return _error("解药只能用于今晚被袭击玩家")
+				return {"ok": true}
+			if witch_choice == "poison":
+				if not bool(state.get("witch_poison", true)):
+					return _error("女巫已无毒药")
+				if target_index == actor_index:
+					return _error("女巫不能毒自己")
+				return {"ok": true}
 			if target_index == wolf_target and bool(state.get("witch_antidote", true)):
 				return {"ok": true}
 			if not bool(state.get("witch_poison", true)):

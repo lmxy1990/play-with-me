@@ -219,7 +219,7 @@ func _check_witch_auto_skip_and_action_rules(engine) -> void:
 	var poison_only := _prepare_witch_phase(engine, _witch_state(false, true, -1), players)
 	assert(String((poison_only.get("current_action", {}) as Dictionary).get("key", "")) == "witch_act")
 	assert(int(engine.suggested_target_for_current_action(poison_only, players)) == 1)
-	var poison_result: Dictionary = engine.apply_target(poison_only, players, 1, 0)
+	var poison_result: Dictionary = engine.apply_target(poison_only, players, 1, 0, "witch_poison")
 	assert(bool(poison_result.get("ok", false)))
 	assert(not bool((poison_result["players"] as Array)[1].get("alive", true)))
 
@@ -230,9 +230,16 @@ func _check_witch_auto_skip_and_action_rules(engine) -> void:
 	var save_only := _prepare_witch_phase(engine, _witch_state(true, false, 2), players)
 	assert(String((save_only.get("current_action", {}) as Dictionary).get("key", "")) == "witch_act")
 	assert(int(engine.suggested_target_for_current_action(save_only, players)) == 2)
-	var save_result: Dictionary = engine.apply_target(save_only, players, 2, 0)
+	var save_result: Dictionary = engine.apply_target(save_only, players, 2, 0, "witch_save")
 	assert(bool(save_result.get("ok", false)))
 	assert(bool((save_result["players"] as Array)[2].get("alive", false)))
+
+	var poison_wolf_target := _prepare_witch_phase(engine, _witch_state(true, true, 2), players)
+	var poison_wolf_target_result: Dictionary = engine.apply_target(poison_wolf_target, players, 2, 0, "witch_poison")
+	assert(bool(poison_wolf_target_result.get("ok", false)))
+	assert(not bool((poison_wolf_target_result["players"] as Array)[2].get("alive", true)))
+	assert(bool((poison_wolf_target_result["werewolf"] as Dictionary).get("witch_antidote", false)))
+	assert(not bool((poison_wolf_target_result["werewolf"] as Dictionary).get("witch_poison", true)))
 
 	var day_state := _witch_state(true, true, 2)
 	day_state["phase"] = "day_discussion"

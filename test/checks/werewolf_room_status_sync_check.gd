@@ -54,6 +54,47 @@ func _initialize() -> void:
 	if not _expect(_find_child_name_prefix(room._modal_layer, "SpeechEditorOverlay") == null, "another actor's speech prompt does not open editor"):
 		return
 
+	room._clear_modal()
+	room._players = [
+		{"name": "真人", "owner": "self", "participant_id": "", "role": "预言家", "role_key": "seer", "role_title": "洞察者", "avatar": "", "base_avatar": "", "alive": true, "ready": true, "state": "等待"},
+		{"name": "狼人", "owner": "human", "participant_id": "peer_wolf", "role": "狼人", "role_key": "wolf", "role_title": "夜行者", "avatar": "", "base_avatar": "", "alive": true, "ready": true, "state": "等待"},
+	]
+	room._local_player_index = 0
+	room._werewolf = {
+		"started": true,
+		"phase": "seer_action",
+		"current_action": {"key": "seer_check", "label": "查验", "icon": "inspect", "actor_index": 0},
+		"last_guarded_index": -1,
+		"night": {},
+		"post_game": {"stage": ""},
+	}
+	if not _expect(room._role_visible_for_current_view(0), "local player role is visible"):
+		return
+	if not _expect(not room._role_visible_for_current_view(1), "host local human view does not reveal other roles after start"):
+		return
+	var task := {
+		"id": "human_action_task",
+		"type": "player_action",
+		"actor_index": 0,
+		"controller_participant_id": "host",
+		"payload": {
+			"action": {"key": "seer_check", "label": "查验", "icon": "inspect", "actor_index": 0},
+			"taskFrame": {
+				"api": "werewolf_device_task_frame.v1",
+				"phase": "seer_action",
+				"currentAction": {"key": "seer_check", "label": "查验", "icon": "inspect", "actor_index": 0},
+				"players": [
+					{"displayName": "真人", "owner": "self", "alive": true, "state": "等待", "avatar": "", "baseAvatar": "", "participantId": "", "roleVisible": true, "role": "预言家", "roleKey": "seer", "roleTitle": "洞察者", "roleAvatar": ""},
+					{"displayName": "狼人", "owner": "human", "alive": true, "state": "等待", "avatar": "", "baseAvatar": "", "participantId": "peer_wolf", "roleVisible": false, "role": "未知", "roleKey": "", "roleTitle": "", "roleAvatar": ""},
+				],
+			},
+		},
+	}
+	room._on_device_task_received(task)
+	await process_frame
+	if not _expect(_find_child_name(room._modal_layer, "TargetConfirmOverlay") != null, "human player action task auto-opens target confirm"):
+		return
+
 	room.queue_free()
 	quit(0)
 

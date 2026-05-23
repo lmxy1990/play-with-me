@@ -33,6 +33,7 @@ const ACTIONS := {
 	"badge_sheriff": "res://assets/images/werewolf/actions/badge_sheriff.svg",
 	"badge_guard": "res://assets/images/werewolf/actions/badge_guard.svg",
 	"badge_mvp": "res://assets/images/werewolf/actions/badge_mvp.svg",
+	"badge_self": "res://assets/images/werewolf/actions/badge_self.svg",
 }
 
 const AVATARS := {

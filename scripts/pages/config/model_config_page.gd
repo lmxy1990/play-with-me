@@ -39,6 +39,8 @@ const DEFAULT_MAX_OUTPUT_TOKEN := 4096
 const MODEL_FIELD_LABEL_WIDTH := 112.0
 const MODEL_SHORT_FIELD_WIDTH := 96.0
 const MODEL_TOKEN_FIELD_WIDTH := 128.0
+const MODEL_PASTE_MAX_MODEL_ID_LENGTH := 25
+const MODEL_PASTE_MIN_SECRET_LENGTH := 30
 
 
 func _init() -> void:
@@ -421,21 +423,12 @@ func _extract_endpoint_from_paste(text: String) -> String:
 	var from_json := _endpoint_from_json_value(json_value)
 	if from_json != "":
 		return from_json
-	var urls := _regex_group_values(text, "(?i)https?://[^\\s\"'<>，。；;]+", 0)
+	var urls := []
+	for line in _paste_non_empty_lines(text):
+		if _line_matches_regex(line, "(?i)^https?://.+$"):
+			urls.append(line)
 	if not urls.is_empty():
 		return _best_endpoint_url(urls)
-	var host := _first_regex_group(text, "(?im)(?:api[_\\s-]*host|base[_\\s-]*host|host|地址)\\s*[:=：]\\s*['\"]?([^'\"\\s,;]+)")
-	var port := _first_regex_group(text, "(?im)(?:api[_\\s-]*(?:port|端口)|port|端口)\\s*[:=：]\\s*(\\d{2,5})")
-	if port != "":
-		var port_value := int(port)
-		var clean_host := host.strip_edges()
-		if clean_host == "":
-			clean_host = "127.0.0.1"
-		if clean_host.begins_with("http://") or clean_host.begins_with("https://"):
-			clean_host = clean_host.replace("http://", "").replace("https://", "")
-		if port_value == 11434:
-			return "http://%s:%d/api" % [clean_host, port_value]
-		return "http://%s:%d/v1" % [clean_host, port_value]
 	return ""
 
 
@@ -444,12 +437,10 @@ func _extract_api_key_from_paste(text: String) -> String:
 	var from_json := _api_key_from_json_value(json_value)
 	if from_json != "":
 		return from_json
-	var bearer := _first_regex_group(text, "(?im)authorization\\s*:\\s*bearer\\s+([^\\s\"',;]+)")
-	if bearer != "":
-		return _clean_pasted_secret(bearer)
-	var key := _first_regex_group(text, "(?im)(?:api[_\\s-]*key|apikey|access[_\\s-]*token|token|secret|密钥|key)\\s*[:=：]\\s*['\"]?([^'\"\\s,;]+)")
-	if key != "":
-		return _clean_pasted_secret(key)
+	for line in _paste_non_empty_lines(text):
+		var candidate := _clean_pasted_secret(line)
+		if _looks_like_pasted_secret(candidate):
+			return candidate
 	return ""
 
 
@@ -457,17 +448,9 @@ func _extract_models_from_paste(text: String) -> Array:
 	var models := []
 	var json_value = _parse_json_like_text(text)
 	_collect_models_from_json_value(json_value, "", models)
-	for line in text.split("\n", false):
-		var clean_line := String(line).strip_edges()
-		if clean_line == "":
-			continue
-		var explicit := _first_regex_group(clean_line, "(?i)(?:model[_\\s-]*(?:name|id)?|models|模型)\\s*[:=：]\\s*(.+)$")
-		if explicit != "":
-			_collect_model_tokens(explicit, models)
-		elif _looks_like_model_id(clean_line):
-			_add_model_id(models, clean_line)
-	for candidate in _regex_group_values(text, "(?i)\\b(?:gpt|o[1-9]|claude|gemini|deepseek|qwen|llama|mistral|mixtral|glm|moonshot|kimi|ernie|yi|codellama|phi|gemma|doubao)[A-Za-z0-9._:/+\\-]*\\b", 0):
-		_add_model_id(models, candidate)
+	for line in _paste_non_empty_lines(text):
+		if _looks_like_model_id(line):
+			_add_model_id(models, line)
 	return models
 
 
@@ -475,22 +458,7 @@ func _parse_json_like_text(text: String):
 	var source := text.strip_edges()
 	if source == "":
 		return null
-	var parsed = _try_parse_json(source)
-	if parsed != null:
-		return parsed
-	var object_start := source.find("{")
-	var object_end := source.rfind("}")
-	if object_start >= 0 and object_end > object_start:
-		parsed = _try_parse_json(source.substr(object_start, object_end - object_start + 1))
-		if parsed != null:
-			return parsed
-	var array_start := source.find("[")
-	var array_end := source.rfind("]")
-	if array_start >= 0 and array_end > array_start:
-		parsed = _try_parse_json(source.substr(array_start, array_end - array_start + 1))
-		if parsed != null:
-			return parsed
-	return null
+	return _try_parse_json(source)
 
 
 func _try_parse_json(source: String):
@@ -527,7 +495,7 @@ func _api_key_from_json_value(value) -> String:
 			var raw = (value as Dictionary).get(key)
 			if raw is String and key_text in ["api_key", "apikey", "key", "token", "access_token", "secret"]:
 				var candidate := _clean_pasted_secret(String(raw))
-				if candidate != "":
+				if _looks_like_pasted_secret(candidate):
 					return candidate
 			var nested := _api_key_from_json_value(raw)
 			if nested != "":
@@ -591,7 +559,7 @@ func _clean_pasted_model_id(model_id: String) -> String:
 
 func _looks_like_model_id(value: String) -> bool:
 	var clean := _clean_pasted_model_id(value)
-	if clean == "" or clean.length() > 96:
+	if clean == "" or clean.length() > MODEL_PASTE_MAX_MODEL_ID_LENGTH:
 		return false
 	var lower := clean.to_lower()
 	if lower.begins_with("http://") or lower.begins_with("https://"):
@@ -601,7 +569,22 @@ func _looks_like_model_id(value: String) -> bool:
 	if lower in ["model", "models", "api", "key", "endpoint", "baseurl", "base_url"]:
 		return false
 	var regex := RegEx.new()
-	if regex.compile("(?i)^(?:gpt|o[1-9]|claude|gemini|deepseek|qwen|llama|mistral|mixtral|glm|moonshot|kimi|ernie|yi|codellama|phi|gemma|doubao)[A-Za-z0-9._:/+\\-]*$") != OK:
+	if regex.compile("^[A-Za-z0-9][A-Za-z0-9._:/+\\-]*$") != OK:
+		return false
+	return regex.search(clean) != null
+
+
+func _looks_like_pasted_secret(value: String) -> bool:
+	var clean := _clean_pasted_secret(value)
+	if clean.length() < MODEL_PASTE_MIN_SECRET_LENGTH:
+		return false
+	var lower := clean.to_lower()
+	if lower.begins_with("http://") or lower.begins_with("https://"):
+		return false
+	if _looks_like_model_id(clean):
+		return false
+	var regex := RegEx.new()
+	if regex.compile("^[A-Za-z0-9._/+\\-]+$") != OK:
 		return false
 	return regex.search(clean) != null
 
@@ -698,6 +681,22 @@ func _clean_pasted_secret(value: String) -> String:
 	clean = clean.trim_prefix("\"").trim_prefix("'").trim_suffix("\"").trim_suffix("'")
 	clean = clean.trim_suffix(",").trim_suffix(";")
 	return clean.strip_edges()
+
+
+func _paste_non_empty_lines(text: String) -> Array:
+	var lines := []
+	for line in text.split("\n", false):
+		var clean_line := String(line).strip_edges()
+		if clean_line != "":
+			lines.append(clean_line)
+	return lines
+
+
+func _line_matches_regex(line: String, pattern: String) -> bool:
+	var regex := RegEx.new()
+	if regex.compile(pattern) != OK:
+		return false
+	return regex.search(line) != null
 
 
 func _regex_group_values(text: String, pattern: String, group_index: int) -> Array:

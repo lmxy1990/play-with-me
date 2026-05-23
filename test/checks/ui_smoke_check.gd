@@ -134,18 +134,10 @@ func _initialize() -> void:
 	await process_frame
 	room._toggle_ready()
 	await process_frame
-	room._save_name(0, "测试玩家")
-	await process_frame
-	room._on_seat_name_edit_pressed(0)
-	await process_frame
-	room._clear_modal()
 	for i in range(1, 6):
 		room._add_bot_at(i, {"id": "ui_smoke_bot_%d" % i, "name": "机器人%d" % i, "model": "默认模型", "voice": "系统默认", "enabled": true})
 		await process_frame
 	await process_frame
-	room._on_seat_name_edit_pressed(1)
-	await process_frame
-	room._clear_modal()
 	if room._pending_action != "":
 		var target := _first_valid_target(room)
 		room._on_seat_pressed(target)

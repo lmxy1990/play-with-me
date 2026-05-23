@@ -10,6 +10,7 @@ var _center_panel: PanelContainer
 var _center_body: VBoxContainer
 var _ready_button: Button
 var _start_button: Button
+var _pause_button: Button
 var _observer_bar: PanelContainer
 var _center_speech_items: Array = []
 var _center_speech_pending_items: Array = []
@@ -63,13 +64,7 @@ func _center_table_panel() -> PanelContainer:
 
 
 func _can_edit_name(index: int) -> bool:
-	if index < 0 or index >= _players.size() or not (_players[index] is Dictionary):
-		return false
-	if _is_local_private_ai_seat(index):
-		return false
-	if _is_network_client():
-		return _participant_controls_index(_current_network_participant_id(), index)
-	return _room_runtime.editable_name(_players, index)
+	return false
 
 
 func _is_empty_seat(index: int) -> bool:
@@ -103,6 +98,49 @@ func _refresh_room_controls() -> void:
 	if _start_button != null:
 		_start_button.visible = _should_show_start_button()
 		_start_button.disabled = not _should_show_start_button()
+	if _pause_button != null:
+		_pause_button.visible = _should_show_pause_button()
+		_pause_button.disabled = not _can_toggle_werewolf_pause()
+		_pause_button.text = _pause_button_text()
+
+
+func _should_show_pause_button() -> bool:
+	return _is_game_started() and not _is_network_client()
+
+
+func _can_toggle_werewolf_pause() -> bool:
+	return _should_show_pause_button()
+
+
+func _pause_button_text() -> String:
+	return "继续" if _is_werewolf_paused() else "暂停"
+
+
+func _toggle_werewolf_pause_from_button() -> void:
+	if not _can_toggle_werewolf_pause():
+		_system_message = "只有房主可暂停游戏"
+		_show_room_system_message_toast()
+		_flash_effect("skip")
+		return
+	if _is_werewolf_paused():
+		if _has_offline_human_players():
+			_system_message = "仍有真人玩家离线，不能继续"
+			_show_room_system_message_toast()
+			_flash_effect("skip")
+			_refresh_room_controls()
+			_refresh_center_panel()
+			return
+		_set_werewolf_paused(false, "", "")
+		_system_message = "游戏继续"
+	else:
+		_set_werewolf_paused(true, "房主暂停", _current_network_participant_id())
+		_system_message = "游戏暂停：房主暂停"
+	_show_room_system_message_toast()
+	_refresh_room_controls()
+	_refresh_center_panel()
+	_commit_state()
+	if not _is_werewolf_paused():
+		_schedule_auto_resolve_bot_turns()
 
 
 func _push_action_prompt(action: String, icon: String, actor_index: int) -> void:
@@ -164,6 +202,7 @@ func _refresh_center_panel() -> void:
 	if _refresh_existing_center_speech_view():
 		return
 	for child in _center_body.get_children():
+		_center_body.remove_child(child)
 		child.queue_free()
 	if _center_panel != null:
 		_center_panel.visible = true
@@ -191,7 +230,7 @@ func _center_idle_view() -> Control:
 func _refresh_existing_center_speech_view() -> bool:
 	if _center_speech_items.is_empty() or not (_center_speech_items.back() is Dictionary):
 		return false
-	if _center_body.get_child_count() != 1:
+	if _center_body.get_child_count() < 1:
 		return false
 	var root := _center_body.get_child(0) as Control
 	if root == null or String(root.name) != "CenterSpeechEntry":
@@ -207,9 +246,13 @@ func _refresh_existing_center_speech_view() -> bool:
 		var name := String(entry.get("name", entry.get("speaker", ""))).strip_edges()
 		speaker_label.text = "%s %s" % [seat, name] if seat != "" else name
 		speaker_label.add_theme_color_override("font_color", TEAL if active else GOLD)
-	var text_label := root.find_child("CenterSpeechTextLabel", true, false) as Label
+	var text_label := root.find_child("CenterSpeechTextLabel", true, false) as RichTextLabel
 	if text_label != null:
-		text_label.text = _center_speech_visible_text(entry)
+		_apply_center_speech_text(text_label, entry)
+	var skip_button := root.find_child("CenterSpeechSkipButton", true, false) as Button
+	if skip_button != null:
+		skip_button.visible = _center_speech_can_skip_tts(entry)
+		skip_button.disabled = not _center_speech_can_skip_tts(entry)
 	var scroll := root.find_child("CenterSpeechTextScroll", true, false) as ScrollContainer
 	if scroll != null:
 		call_deferred("_scroll_center_speech_text_to_progress", scroll, float(entry.get("progress", 1.0)))
@@ -533,9 +576,16 @@ func _center_speech_entry_view(entry: Dictionary) -> Control:
 	var title := "%s %s" % [seat, name] if seat != "" else name
 	var speaker_label := _nowrap_label(title, 13, TEAL if active else GOLD, true)
 	speaker_label.name = "CenterSpeechSpeakerLabel"
+	_force_ltr_label(speaker_label)
 	speaker_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	speaker_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(speaker_label)
+	var skip_button := _mini_icon_button("跳过", func(): call("_skip_current_center_speech_tts"))
+	skip_button.name = "CenterSpeechSkipButton"
+	skip_button.tooltip_text = "跳过此次播报"
+	skip_button.visible = _center_speech_can_skip_tts(entry)
+	skip_button.disabled = not _center_speech_can_skip_tts(entry)
+	header.add_child(skip_button)
 	root.add_child(header)
 	root.add_child(_center_speech_text_view(entry))
 	return root
@@ -552,34 +602,85 @@ func _center_speech_text_view(entry: Dictionary) -> ScrollContainer:
 	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 	scroll.clip_contents = true
 	var progress := float(entry.get("progress", 1.0))
-	var text := _center_speech_visible_text(entry)
-	var content := _label(text, 13, INK, false)
+	var content := RichTextLabel.new()
 	content.name = "CenterSpeechTextLabel"
+	content.bbcode_enabled = true
+	content.fit_content = true
+	content.scroll_active = false
 	content.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
-	content.clip_text = false
+	content.text_direction = Control.TEXT_DIRECTION_LTR
+	content.add_theme_font_size_override("normal_font_size", _ui_font_size(13))
+	content.add_theme_color_override("default_color", INK)
+	content.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_center_speech_text(content, entry)
 	scroll.add_child(content)
 	call_deferred("_scroll_center_speech_text_to_progress", scroll, progress)
 	return scroll
 
 
+func _force_ltr_label(label: Label) -> void:
+	label.layout_direction = Control.LAYOUT_DIRECTION_LTR
+	label.text_direction = Control.TEXT_DIRECTION_LTR
+
+
 func _center_speech_visible_text(entry: Dictionary) -> String:
-	var text := String(entry.get("text", "")).strip_edges()
+	return String(entry.get("text", "")).strip_edges()
+
+
+func _apply_center_speech_text(label: RichTextLabel, entry: Dictionary) -> void:
+	if label == null:
+		return
+	var text := _center_speech_visible_text(entry)
 	if text == "":
-		return ""
+		label.text = ""
+		return
 	if not bool(entry.get("reveal_with_progress", false)):
-		return text
+		label.bbcode_enabled = false
+		label.text = text
+		return
 	var progress := clampf(float(entry.get("progress", 0.0)), 0.0, 1.0)
-	if progress >= 1.0:
-		return text
 	var total_chars := text.length()
-	if total_chars <= 0:
-		return ""
-	var visible_chars := int(ceil(float(total_chars) * progress))
-	if visible_chars <= 0:
-		return ""
-	return text.substr(0, mini(total_chars, visible_chars))
+	var split_index := int(round(float(total_chars) * progress))
+	split_index = maxi(0, mini(total_chars, split_index))
+	var played := _escape_center_speech_bbcode(text.substr(0, split_index))
+	var pending := _escape_center_speech_bbcode(text.substr(split_index))
+	label.bbcode_enabled = true
+	label.text = "[color=#%s][b]%s[/b][/color][color=#%s]%s[/color]" % [
+		TEAL.to_html(false),
+		played,
+		INK.to_html(false),
+		pending,
+	]
+
+
+func _escape_center_speech_bbcode(text: String) -> String:
+	return text.replace("[", "[lb]")
+
+
+func _center_speech_can_skip_tts(entry: Dictionary) -> bool:
+	if not bool(entry.get("active", false)):
+		return false
+	if _tts_runtime == null or not is_instance_valid(_tts_runtime):
+		return false
+	if not _tts_runtime.has_method("is_speaking") or not bool(_tts_runtime.call("is_speaking")):
+		return false
+	if not _tts_runtime.has_method("current_item"):
+		return false
+	var current_value = _tts_runtime.call("current_item")
+	if not (current_value is Dictionary):
+		return false
+	var current: Dictionary = current_value
+	return _center_speech_match_key(current) == String(entry.get("match_key", ""))
+
+
+func _skip_current_center_speech_tts() -> void:
+	if _tts_runtime == null or not is_instance_valid(_tts_runtime) or not _tts_runtime.has_method("skip_current"):
+		return
+	if bool(_tts_runtime.call("skip_current")):
+		_system_message = "已跳过播报"
+		_show_room_system_message_toast()
+		_refresh_center_panel()
 
 
 func _scroll_center_speech_text_to_progress(scroll, progress: float) -> void:
@@ -595,6 +696,7 @@ func _scroll_center_speech_text_to_progress(scroll, progress: float) -> void:
 
 func _center_speech_avatar(entry: Dictionary) -> Control:
 	var avatar := CircleAvatarScript.new()
+	avatar.name = "CenterSpeechAvatar"
 	avatar.texture = _texture(String(entry.get("avatar", "")))
 	avatar.custom_minimum_size = Vector2(34, 34)
 	avatar.ring_color = Color(0.96, 0.70, 0.32, 0.82)

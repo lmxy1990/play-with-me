@@ -1,5 +1,7 @@
 extends SceneTree
 
+const PromptPolicyScript := preload("res://scripts/player/werewolf/ai/ai_werewolf_prompt_policy.gd")
+
 
 func _initialize() -> void:
 	var parser = load("res://scripts/player/werewolf/ai/ai_werewolf_target_intent.gd").new()
@@ -19,6 +21,7 @@ func _initialize() -> void:
 
 	_seed_players(page)
 	_check_private_timeline_visibility(page)
+	_check_bot_memory_write_disabled(page)
 	_check_intent_overrides_vote(page)
 	_check_vote_resolution(page)
 	_check_network_snapshot_filters_wolf_history(page)
@@ -61,6 +64,14 @@ func _check_private_timeline_visibility(page) -> void:
 	for event in villager_state["timeline"]:
 		assert(String((event as Dictionary).get("type", "")) != "wolf_spoke")
 	assert(page._history.size() == 1)
+
+
+func _check_bot_memory_write_disabled(page) -> void:
+	assert(not bool(PromptPolicyScript.write_memory_enabled))
+	page._record_bot_speech(0, "这条机器人记忆当前不应该写入。")
+	var scope: Dictionary = page._memory_scope_for_player(0, true)
+	var context: Dictionary = page._memory_manager.prompt_context(scope)
+	assert((context.get("recentMemoryEntries", []) as Array).is_empty())
 
 
 func _check_intent_overrides_vote(page) -> void:

@@ -70,8 +70,14 @@ func play_action_effect(kind: String) -> void:
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if OS.is_debug_build():
+			print("[WerewolfSeatClick][debug] card_pressed index=%d owner=%s name=%s pos=%s" % [index, String(data.get("owner", "")), _display_name(), _debug_input_position(event)])
+		accept_event()
 		seat_pressed.emit(index)
 	elif event is InputEventScreenTouch and event.pressed:
+		if OS.is_debug_build():
+			print("[WerewolfSeatClick][debug] card_pressed index=%d owner=%s name=%s pos=%s" % [index, String(data.get("owner", "")), _display_name(), _debug_input_position(event)])
+		accept_event()
 		seat_pressed.emit(index)
 
 
@@ -80,6 +86,8 @@ func _on_edit_pressed() -> void:
 
 
 func _on_voice_toggle_pressed() -> void:
+	if OS.is_debug_build():
+		print("[WerewolfSeatClick][debug] voice_toggle_pressed index=%d owner=%s name=%s" % [index, String(data.get("owner", "")), _display_name()])
 	voice_toggle_pressed.emit(index)
 
 
@@ -208,6 +216,7 @@ func _add_avatar_badges() -> void:
 func _layout_children() -> void:
 	var avatar_size := _avatar_size()
 	var avatar_center := _avatar_center()
+	var voice_button := get_node_or_null("SeatCardVoiceToggleButton") as TextureButton
 	var num := get_node_or_null("AvatarNumber") as Label
 	if num != null:
 		num.position = avatar_center - Vector2(avatar_size, avatar_size) * 0.5
@@ -227,25 +236,30 @@ func _layout_children() -> void:
 		var edit := get_node_or_null("EditButton") as TextureButton
 		var vote_badge := get_node_or_null("VoteCountBadge") as Label
 		var vote_badge_width := 34.0 if vote_badge != null else 0.0
-		var vote_badge_gap := 4.0 if vote_badge != null else 0.0
-		var label_width := size.x - 10.0 - (24.0 if edit != null else 0.0) - vote_badge_width - vote_badge_gap
-		name_label.position = Vector2(5.0, info_top + 21.0)
-		name_label.size = Vector2(maxf(0.0, label_width), 19.0)
-		if vote_badge != null:
-			vote_badge.position = Vector2(5.0 + maxf(0.0, label_width) + vote_badge_gap, info_top + 21.0)
-			vote_badge.size = Vector2(vote_badge_width, 19.0)
+		var right_x := size.x - 5.0
+		if voice_button != null:
+			right_x -= 22.0
+			voice_button.position = Vector2(right_x, info_top + 20.0)
+			voice_button.size = Vector2(22, 22)
+			right_x -= 4.0
 		if edit != null:
-			edit.position = Vector2(5.0 + maxf(0.0, label_width) + vote_badge_width + vote_badge_gap + 1.0, info_top + 20.0)
+			right_x -= 20.0
+			edit.position = Vector2(right_x, info_top + 20.0)
 			edit.size = Vector2(20, 20)
+			right_x -= 4.0
+		if vote_badge != null:
+			right_x -= vote_badge_width
+			vote_badge.position = Vector2(right_x, info_top + 21.0)
+			vote_badge.size = Vector2(vote_badge_width, 19.0)
+			right_x -= 4.0
+		var label_width := maxf(0.0, right_x - 5.0)
+		name_label.position = Vector2(5.0, info_top + 21.0)
+		name_label.size = Vector2(label_width, 19.0)
 	var badge := get_node_or_null("SeatNumberBadge") as Label
 	if badge != null:
 		var badge_size := Vector2(32.0, 18.0)
 		badge.position = avatar_center + Vector2(-avatar_size * 0.48, avatar_size * 0.20)
 		badge.size = badge_size
-	var voice := get_node_or_null("SeatCardVoiceToggleButton") as TextureButton
-	if voice != null:
-		voice.position = avatar_center + Vector2(-avatar_size * 0.58, -avatar_size * 0.54)
-		voice.size = Vector2(24, 24)
 	_layout_avatar_badges(avatar_center, avatar_size)
 
 
@@ -293,8 +307,9 @@ func _draw() -> void:
 	if voice != null:
 		var enabled := bool(data.get("tts_enabled", true))
 		var vc := voice.position + voice.size * 0.5
-		draw_circle(vc, 13.0, Color(0.010, 0.016, 0.020, 0.88))
-		draw_arc(vc, 12.0, 0, TAU, 36, Color(0.96, 0.70, 0.32, 0.72 if enabled else 0.26), 1.5, true)
+		var voice_radius := minf(voice.size.x, voice.size.y) * 0.50
+		draw_circle(vc, voice_radius, Color(0.010, 0.016, 0.020, 0.88))
+		draw_arc(vc, maxf(1.0, voice_radius - 1.0), 0, TAU, 36, Color(0.96, 0.70, 0.32, 0.72 if enabled else 0.26), 1.5, true)
 		if not enabled:
 			draw_line(vc + Vector2(-5.5, 5.5), vc + Vector2(5.5, -5.5), Color(0.92, 0.20, 0.16, 0.92), 2.0, true)
 	for badge_value in _avatar_badge_nodes():
@@ -381,6 +396,8 @@ func _avatar_badge_node_name(badge_id: String, badge_index: int) -> String:
 			return "GuardAvatarBadge"
 		"mvp":
 			return "MvpAvatarBadge"
+		"self":
+			return "SelfAvatarBadge"
 		_:
 			return "AvatarBadge%d" % badge_index
 
@@ -440,6 +457,14 @@ func _visible_role_title() -> String:
 func _display_name() -> String:
 	var name := String(data.get("name", data.get("displayName", ""))).strip_edges()
 	return name if name != "" else "%d号位" % [index + 1]
+
+
+func _debug_input_position(event: InputEvent) -> String:
+	if event is InputEventMouseButton:
+		return str((event as InputEventMouseButton).position)
+	if event is InputEventScreenTouch:
+		return str((event as InputEventScreenTouch).position)
+	return "-"
 
 
 func _info_panel_style() -> StyleBoxFlat:

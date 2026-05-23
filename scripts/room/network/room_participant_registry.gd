@@ -50,7 +50,7 @@ func ensure_reconnect_token(room: Dictionary, participant_id: String) -> String:
 	return token
 
 
-func register_observer(room: Dictionary, participant_id: String, display_name: String, auth: Dictionary) -> void:
+func register_observer(room: Dictionary, participant_id: String, display_name: String, auth: Dictionary, identity: Dictionary = {}) -> void:
 	var observers_value = room.get("observers", [])
 	var observers: Array = (observers_value as Array) if observers_value is Array else []
 	for i in range(observers.size()):
@@ -59,16 +59,55 @@ func register_observer(room: Dictionary, participant_id: String, display_name: S
 			existing["displayName"] = display_name
 			existing["device_id"] = String(auth.get("deviceId", ""))
 			existing["public_key"] = String(auth.get("publicKey", ""))
+			_apply_observer_identity(existing, identity)
 			observers[i] = existing
 			room["observers"] = observers
 			return
-	observers.append({
+	var observer := {
 		"id": participant_id,
 		"displayName": display_name,
 		"device_id": String(auth.get("deviceId", "")),
 		"public_key": String(auth.get("publicKey", "")),
-	})
+	}
+	_apply_observer_identity(observer, identity)
+	observers.append(observer)
 	room["observers"] = observers
+
+
+func _apply_observer_identity(observer: Dictionary, identity: Dictionary) -> void:
+	var avatar_id := String(identity.get("avatar_id", "")).strip_edges()
+	if avatar_id == "":
+		avatar_id = String(identity.get("avatarId", "")).strip_edges()
+	if avatar_id != "":
+		observer["avatar_id"] = avatar_id
+		observer["avatarId"] = avatar_id
+	var avatar := String(identity.get("avatar", "")).strip_edges()
+	if avatar == "":
+		avatar = String(identity.get("avatar_path", "")).strip_edges()
+	if avatar == "":
+		avatar = String(identity.get("avatarPath", "")).strip_edges()
+	if avatar == "":
+		avatar = String(identity.get("base_avatar", "")).strip_edges()
+	if avatar != "":
+		observer["avatar"] = avatar
+	var voice_config_id := String(identity.get("voice_config_id", "")).strip_edges()
+	if voice_config_id == "":
+		voice_config_id = String(identity.get("voiceConfigId", "")).strip_edges()
+	if voice_config_id == "":
+		voice_config_id = String(identity.get("playback_voice_config_id", "")).strip_edges()
+	if voice_config_id == "":
+		voice_config_id = String(identity.get("playbackVoiceConfigId", "")).strip_edges()
+	if voice_config_id != "":
+		observer["voice_config_id"] = voice_config_id
+		observer["voiceConfigId"] = voice_config_id
+		observer["playback_voice_config_id"] = voice_config_id
+		observer["playbackVoiceConfigId"] = voice_config_id
+	var voice_name := String(identity.get("voice", "")).strip_edges()
+	if voice_name == "":
+		voice_name = String(identity.get("voiceName", "")).strip_edges()
+	if voice_name != "":
+		observer["voice"] = voice_name
+		observer["voiceName"] = voice_name
 
 
 func observer_for_participant(room: Dictionary, participant_id: String) -> Dictionary:

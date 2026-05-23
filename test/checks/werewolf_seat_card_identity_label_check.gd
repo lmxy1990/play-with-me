@@ -64,6 +64,27 @@ func _initialize() -> void:
 		return
 	if not _expect(_controls_do_not_overlap(badge_card, "SeatCardVoiceToggleButton", "SheriffAvatarBadge"), "voice toggle does not overlap avatar badges"):
 		return
+	if not _expect(_control_outside_avatar_center_tap(badge_card, "SeatCardVoiceToggleButton"), "voice toggle does not cover the avatar detail tap area"):
+		return
+
+	var self_card := _seat_card(2, {
+		"name": "本机玩家",
+		"owner": "self",
+		"role": "预言家",
+		"role_title": "洞察者",
+		"role_visible": false,
+		"avatar": "",
+		"alive": true,
+		"ready": true,
+		"avatar_badges": [
+			{"id": "self", "icon": "test://self", "tooltip": "我的头像"},
+		],
+	})
+	self_card.texture_provider = Callable(self, "_dummy_texture")
+	root.add_child(self_card)
+	await process_frame
+	if not _expect(_control_inside_card(self_card, "SelfAvatarBadge"), "self avatar badge is laid out inside the seat card"):
+		return
 
 	var hidden_card := _seat_card(2, {
 		"displayName": "联网玩家",
@@ -148,6 +169,16 @@ func _controls_do_not_overlap(card: Control, left_name: String, right_name: Stri
 	if left == null or right == null:
 		return false
 	return not Rect2(left.position, left.size).intersects(Rect2(right.position, right.size))
+
+
+func _control_outside_avatar_center_tap(card: Control, child_name: String) -> bool:
+	var control := card.find_child(child_name, false, false) as Control
+	if control == null:
+		return false
+	var avatar_size: float = clampf(card.size.y * 0.54, 54.0, 66.0)
+	var avatar_center := Vector2(card.size.x * 0.5, avatar_size * 0.5 + 4.0)
+	var avatar_center_tap := Rect2(avatar_center - Vector2(avatar_size, avatar_size) * 0.32, Vector2(avatar_size, avatar_size) * 0.64)
+	return not Rect2(control.position, control.size).intersects(avatar_center_tap)
 
 
 func _dummy_texture(_path: String) -> Texture2D:

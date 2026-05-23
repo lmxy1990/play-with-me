@@ -43,6 +43,7 @@ func system_prompt(context: Dictionary = {}) -> String:
 	lines.append_array(_game_rule_prompt_lines(visible_state))
 	lines.append_array(_user_input_format_prompt_lines())
 	if _is_single_speech_context(context):
+		lines.append_array(_speech_principle_prompt_lines(context))
 		lines.append_array(_speech_output_format_prompt_lines())
 	elif _is_action_context(context):
 		lines.append_array(_action_output_format_prompt_lines(context))
@@ -101,6 +102,15 @@ func _speech_output_format_prompt_lines() -> Array:
 	return [
 		"输出：直接返回发言文本，不要 JSON。建议回复在120字以内。",
 	]
+
+
+func _speech_principle_prompt_lines(context: Dictionary) -> Array:
+	var lines := [
+		"发言原则：结合你当前身份、当前阶段和可见信息发言，优先说符合自身身份利益的话；可以伪装、试探、误导，也可以按策略故意暴露。",
+	]
+	if String(_as_dict(context.get("turn_metadata", {})).get("sequenceKind", "")) == "last_words":
+		lines.append("遗言是全局可见的。")
+	return lines
 
 
 func _action_output_format_prompt_lines(context: Dictionary) -> Array:

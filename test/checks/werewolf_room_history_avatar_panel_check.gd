@@ -44,9 +44,23 @@ func _initialize() -> void:
 		return
 	if not _expect(room.find_child("HistoryAvatar", true, false) != null, "history rows use circular avatars"):
 		return
+	var history_avatar := room.find_child("HistoryAvatar", true, false) as Control
+	history_avatar.emit_signal("gui_input", _mouse_click(history_avatar.size * 0.5))
+	await process_frame
+	if not _expect(room.find_child("SeatDetailOverlay", true, false) != null, "clicking a history player avatar opens seat detail"):
+		return
+	room._clear_modal()
+	room._open_history()
+	await process_frame
 	if not _expect(room.find_child("HistoryChatMetaLabel", true, false) != null, "history rows show slot name"):
 		return
 	if not _expect(room.find_child("HistoryChatContentLabel", true, false) != null, "history rows show speech content"):
+		return
+	var history_meta := room.find_child("HistoryChatMetaLabel", true, false) as Label
+	var history_content := room.find_child("HistoryChatContentLabel", true, false) as Label
+	if not _expect(history_meta.text_direction == Control.TEXT_DIRECTION_LTR, "history speaker text is fixed left-to-right"):
+		return
+	if not _expect(history_content.text_direction == Control.TEXT_DIRECTION_LTR, "history speech text is fixed left-to-right"):
 		return
 
 	room._clear_modal()
@@ -54,16 +68,21 @@ func _initialize() -> void:
 	var speech := "我这轮只看原始发言内容，保留 12 号和 JSON: {\"a\":1} 这些字符。"
 	room._show_center_speech_item({"speaker": "2号 玩家B", "text": speech, "at": 88.0}, true, false, true)
 	await process_frame
-	var center_label := room.find_child("CenterSpeechTextLabel", true, false) as Label
+	var center_label := room.find_child("CenterSpeechTextLabel", true, false) as RichTextLabel
 	if not _expect(center_label != null, "center panel renders a plain text label"):
 		return
 	if not _expect(center_label.text == speech, "center panel preserves original text"):
+		return
+	if not _expect(center_label.text_direction == Control.TEXT_DIRECTION_LTR, "center speech text is fixed left-to-right"):
+		return
+	var center_speaker := room.find_child("CenterSpeechSpeakerLabel", true, false) as Label
+	if not _expect(center_speaker != null and center_speaker.text_direction == Control.TEXT_DIRECTION_LTR, "center speaker text is fixed left-to-right"):
 		return
 	if not _expect(room.find_child("CenterSpeechTextScroll", true, false) != null, "center panel text area is scrollable"):
 		return
 	if not _expect(not _contains_progress_bar(room._center_panel), "center panel no longer shows progress format"):
 		return
-	if not _expect(not _contains_rich_text(room._center_panel), "center panel no longer uses bbcode output"):
+	if not _expect(_contains_rich_text(room._center_panel), "center panel uses rich text for playback highlight"):
 		return
 
 	room.queue_free()
@@ -132,6 +151,14 @@ func _contains_rich_text(node: Node) -> bool:
 		if _contains_rich_text(child):
 			return true
 	return false
+
+
+func _mouse_click(position: Vector2) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	event.position = position
+	return event
 
 
 func _expect(condition: bool, message: String) -> bool:

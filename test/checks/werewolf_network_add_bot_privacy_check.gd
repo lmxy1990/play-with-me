@@ -20,12 +20,14 @@ class CaptureClientSession:
 	func request_add_bot(seat_index: int, display_name: String) -> bool:
 		return request_add_controlled_player(seat_index, display_name)
 
-	func request_add_controlled_player(seat_index: int, display_name: String) -> bool:
-		return send_client("add_controlled_player", {
+	func request_add_controlled_player(seat_index: int, display_name: String, identity_payload: Dictionary = {}) -> bool:
+		var payload := identity_payload.duplicate(true)
+		payload.merge({
 			"seatIndex": seat_index,
 			"seatNumber": seat_index + 1,
 			"displayName": display_name.strip_edges(),
-		})
+		}, true)
+		return send_client("add_controlled_player", payload)
 
 	func send_client(type: String, payload: Dictionary = {}, _message_id: String = "") -> bool:
 		payloads.append({"type": type, "payload": payload.duplicate(true)})
@@ -88,10 +90,12 @@ func _check_request_payload_is_public() -> void:
 	if not _expect(String(message.get("type", "")) == "add_controlled_player", "client request type is add_controlled_player"):
 		return
 	var payload: Dictionary = message.get("payload", {})
-	for key in ["botProfileId", "bot_profile_id", "model", "voice", "api_key", "endpoint"]:
+	for key in ["botProfileId", "bot_profile_id", "model", "api_key", "endpoint"]:
 		if not _expect(not payload.has(key), "add_controlled_player request strips %s" % key):
 			return
 	if not _expect(String(payload.get("displayName", "")) == "Alpha", "add_bot uses public profile name"):
+		return
+	if not _expect(String(payload.get("voiceName", "")) == "系统默认", "add_bot sends public voice identity"):
 		return
 	page.queue_free()
 
@@ -121,9 +125,13 @@ func _check_host_stores_public_bot_only() -> void:
 		return
 	if not _expect(String(bot.get("controller_participant_id", "")) == "peer_device", "host stores only controller device"):
 		return
-	for key in ["bot_profile_id", "model", "voice", "api_key", "endpoint"]:
+	for key in ["bot_profile_id", "model", "api_key", "endpoint"]:
 		if not _expect(String(bot.get(key, "")).strip_edges() == "", "host bot has no private field %s" % key):
 			return
+	if not _expect(String(bot.get("voice", "")) == "private-voice", "host bot keeps public voice identity"):
+		return
+	if not _expect(String(bot.get("voiceName", "")) == "private-voice", "host bot keeps public voiceName identity"):
+		return
 	page.queue_free()
 
 

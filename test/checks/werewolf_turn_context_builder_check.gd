@@ -124,6 +124,23 @@ func _check_role_visibility(builder, runtime) -> void:
 	var wrong_source_players: Array = wrong_source_payload["players"]
 	assert(String((wrong_source_players[3] as Dictionary).get("role", "")) == "未知")
 
+	var viewer_visibility_input := _input()
+	var visible_to_device_player: Dictionary = (viewer_visibility_input["players"] as Array)[1]
+	visible_to_device_player["role_visible"] = true
+	visible_to_device_player["roleVisible"] = true
+	(viewer_visibility_input["players"] as Array)[1] = visible_to_device_player
+	var viewer_visibility_payload: Dictionary = runtime.to_model_payload(builder.speech_context(viewer_visibility_input, 2, {}))
+	var viewer_visibility_players: Array = viewer_visibility_payload["players"]
+	assert(String((viewer_visibility_players[1] as Dictionary).get("role", "")) == "未知")
+
+	var public_reveal_input := _input()
+	var public_player: Dictionary = (public_reveal_input["players"] as Array)[1]
+	public_player["public_role_visible"] = true
+	(public_reveal_input["players"] as Array)[1] = public_player
+	var public_reveal_payload: Dictionary = runtime.to_model_payload(builder.speech_context(public_reveal_input, 2, {}))
+	var public_reveal_players: Array = public_reveal_payload["players"]
+	assert(String((public_reveal_players[1] as Dictionary).get("role", "")) == "狼人")
+
 
 func _check_timeline_compression(builder) -> void:
 	var input := _input()

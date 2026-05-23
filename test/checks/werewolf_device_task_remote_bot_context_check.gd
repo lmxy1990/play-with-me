@@ -91,6 +91,8 @@ func _initialize() -> void:
 			"controller_participant_id": "host",
 			"role_key": "wolf",
 			"role": "狼人",
+			"voice": "系统默认",
+			"voiceName": "系统默认",
 			"alive": true,
 		},
 		{
@@ -124,7 +126,7 @@ func _initialize() -> void:
 func _check_profile_initializes_from_local_bot_profile(page) -> void:
 	if not _expect(not page._players[0].has("model"), "public local bot does not store model"):
 		return
-	if not _expect(not page._players[0].has("voice"), "public local bot does not store voice"):
+	if not _expect(String(page._players[0].get("voice", "")) == "系统默认", "public local bot stores voice identity"):
 		return
 	if not _expect(String(page._local_private_bot_profile_id_for_seat(0)) == "remote_bot_profile", "local bot profile is kept in private seat cache"):
 		return

@@ -1,5 +1,9 @@
 extends RefCounted
 
+const RoleCatalogScript := preload("res://scripts/room/werewolf/werewolf_role_catalog.gd")
+
+var _role_catalog = RoleCatalogScript.new()
+
 
 func snapshot_for_participant(
 	room: Dictionary,
@@ -17,7 +21,7 @@ func snapshot_for_participant(
 	var can_view_private := can_view_wolf_private_history or participant_is_observer(room, participant_id)
 	return {
 		"room": _public_room(room),
-		"players": players_for_participant(players, participant_id),
+		"players": players_for_participant(players, participant_id, room, werewolf),
 		"werewolf": werewolf.duplicate(true),
 		"history": history_for_participant(history, players, room, participant_id, local_player_index, can_view_private),
 		"wolfPrivateHistory": wolf_private_history.duplicate(true) if can_view_private else [],
@@ -50,14 +54,18 @@ func replica_state_payload(
 	}
 
 
-func players_for_participant(players: Array, participant_id: String) -> Array:
+func players_for_participant(players: Array, participant_id: String, room: Dictionary = {}, werewolf: Dictionary = {}) -> Array:
 	var result := []
+	var viewer_index := seat_for_participant(players, participant_id)
+	var viewer_is_observer := participant_is_observer(room, participant_id)
+	var reveal_all_roles := _roles_visible_to_all(werewolf)
 	for i in range(players.size()):
 		if not (players[i] is Dictionary):
 			result.append(players[i])
 			continue
 		var player: Dictionary = (players[i] as Dictionary).duplicate(true)
 		_strip_private_player_fields(player)
+		_apply_role_visibility(player, players, i, viewer_index, viewer_is_observer, reveal_all_roles)
 		var owner := String(player.get("owner", ""))
 		var player_participant := String(player.get("participant_id", ""))
 		if owner == "self" or owner == "human":
@@ -188,8 +196,54 @@ func _public_room(room: Dictionary) -> Dictionary:
 
 
 func _strip_private_player_fields(player: Dictionary) -> void:
-	for field in ["api_key", "apiKey", "endpoint", "provider", "model", "modelName", "model_name", "modelProfile", "model_profile", "modelConfig", "model_config", "requestOptions", "request_options", "response_schema", "responseSchema", "schema", "voice", "voiceName", "voice_name", "bot_profile_id", "botProfileId", "formt_adapter", "formtAdapter", "format_adapter", "formatAdapter", "output_adapter", "outputAdapter", "reason_adapter", "reasonAdapter", "reasoning_adapter", "reasoningAdapter", "temperature", "max_output", "maxOutput", "max_output_tokens", "maxOutputTokens", "max_context", "maxContext"]:
+	for field in ["api_key", "apiKey", "endpoint", "provider", "model", "modelName", "model_name", "modelProfile", "model_profile", "modelConfig", "model_config", "requestOptions", "request_options", "response_schema", "responseSchema", "schema", "bot_profile_id", "botProfileId", "formt_adapter", "formtAdapter", "format_adapter", "formatAdapter", "output_adapter", "outputAdapter", "reason_adapter", "reasonAdapter", "reasoning_adapter", "reasoningAdapter", "temperature", "max_output", "maxOutput", "max_output_tokens", "maxOutputTokens", "max_context", "maxContext"]:
 		player.erase(field)
+
+
+func _apply_role_visibility(player: Dictionary, players: Array, target_index: int, viewer_index: int, viewer_is_observer: bool, reveal_all_roles: bool) -> void:
+	if String(player.get("owner", "")).strip_edges() == "":
+		player["role_visible"] = true
+		return
+	var visible := _role_visible_for_viewer(players, target_index, viewer_index, viewer_is_observer, reveal_all_roles)
+	player["role_visible"] = visible
+	if visible:
+		return
+	player["role"] = "未知"
+	player["role_key"] = ""
+	player["roleKey"] = ""
+	player["role_title"] = ""
+	player["roleTitle"] = ""
+	player["role_avatar"] = ""
+	player["roleAvatar"] = ""
+
+
+func _role_visible_for_viewer(players: Array, target_index: int, viewer_index: int, viewer_is_observer: bool, reveal_all_roles: bool) -> bool:
+	if target_index < 0 or target_index >= players.size() or not (players[target_index] is Dictionary):
+		return false
+	if reveal_all_roles or viewer_is_observer or target_index == viewer_index:
+		return true
+	var player: Dictionary = players[target_index]
+	if _role_publicly_revealed(player):
+		return true
+	if viewer_index >= 0 and viewer_index < players.size() and players[viewer_index] is Dictionary:
+		var viewer_role := String((players[viewer_index] as Dictionary).get("role_key", "")).strip_edges()
+		var target_role := String(player.get("role_key", "")).strip_edges()
+		if _role_catalog.can_see_wolf_teammates(viewer_role) and _role_catalog.is_wolf_team(target_role) and _role_catalog.visible_to_wolf_teammates(target_role):
+			return true
+	return false
+
+
+func _role_publicly_revealed(player: Dictionary) -> bool:
+	return bool(player.get("idiot_revealed", false)) or bool(player.get("public_role_visible", false))
+
+
+func _roles_visible_to_all(werewolf: Dictionary) -> bool:
+	var phase := String(werewolf.get("phase", "lobby")).strip_edges()
+	if phase == "" or phase == "lobby":
+		return true
+	if not bool(werewolf.get("started", false)):
+		return true
+	return phase in ["replay_round", "post_game_summary", "mvp_vote", "completed"]
 
 
 func participant_matches(participant_id: String, owner: String, player_participant: String) -> bool:

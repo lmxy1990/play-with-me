@@ -41,6 +41,26 @@ func _initialize() -> void:
 		return
 	if not _expect(not room._start_button.visible, "start button hides after game starts"):
 		return
+	if not _expect(room._pause_button != null, "pause button exists"):
+		return
+	if not _expect(room._pause_button.visible, "pause button is visible after game starts"):
+		return
+	if not _expect(String(room._pause_button.text) == "暂停", "pause button initially pauses"):
+		return
+	room._pause_button.pressed.emit()
+	await process_frame
+	if not _expect(bool(room._werewolf.get("paused", false)), "pause button pauses game"):
+		return
+	if not _expect(String(room._werewolf.get("pause_reason", "")) == "房主暂停", "pause reason is host pause"):
+		return
+	if not _expect(String(room._pause_button.text) == "继续", "paused button resumes"):
+		return
+	room._pause_button.pressed.emit()
+	await process_frame
+	if not _expect(not bool(room._werewolf.get("paused", false)), "pause button resumes game"):
+		return
+	if not _expect(String(room._pause_button.text) == "暂停", "resumed button pauses again"):
+		return
 	if not _expect(room._history.size() > 0, "started game should write opening timeline"):
 		return
 	room._history.append({"speaker": "主持人", "text": "上一局旧记录", "at": 99.0})
