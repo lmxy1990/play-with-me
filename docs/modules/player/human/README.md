@@ -15,6 +15,7 @@
        -> 断联恢复后的真人请求重投递
   -> 具体游戏真人玩家模块
        -> 狼人杀真人玩家模块
+       -> 象棋真人玩家模块
 ```
 
 真人玩家模块只处理“人如何完成一次玩家请求”。具体游戏的按钮、目标列表、文本输入和提示文案由具体游戏真人玩家模块提供。
@@ -44,4 +45,4 @@ scripts/player/human/
   human_player_controller.gd
 ```
 
-具体游戏真人玩家实现放在对应游戏目录，例如狼人杀真人玩家模块位于 `scripts/player/werewolf/human/`。
+具体游戏真人玩家实现放在对应游戏目录，例如狼人杀真人玩家模块位于 `scripts/player/werewolf/human/`，象棋真人玩家模块位于 `scripts/player/xiangqi/human/`。

@@ -19,7 +19,7 @@ func _build_join_payload(_as_observer: bool = false) -> String:
 		_room_network_port,
 		String(room.get("id", "")),
 		String(room.get("name", "狼人杀房间")),
-		_game_id_for_room_type(String(room.get("type", "狼人杀"))),
+		_game_id_for_room(room),
 		false,
 		password,
 		String(_device_identity.device_id),
@@ -78,7 +78,7 @@ func _join_discovered_room(room: Dictionary) -> void:
 			int(room.get("port", 0)),
 			String(room.get("id", "")),
 			String(room.get("name", "狼人杀房间")),
-			_game_id_for_room_type(String(room.get("type", "狼人杀"))),
+			_game_id_for_room(room),
 			false,
 			String(room.get("password", "")),
 			String(room.get("host_device_id", room.get("hostDeviceId", ""))),
@@ -115,14 +115,15 @@ func _join_room_from_payload(payload: String, interactive: bool = false) -> bool
 			break
 	var known_map_id := String(known_room.get("map_id", known_room.get("mapId", ""))).strip_edges()
 	var parsed_map_id := String(parsed.get("mapId", "")).strip_edges()
+	var game_id := String(parsed.get("gameId", "werewolf")).strip_edges()
 	var joined_map_id := known_map_id if known_map_id != "" else parsed_map_id
 	if joined_map_id == "":
-		joined_map_id = "basic_village"
+		joined_map_id = "xiangqi_standard" if game_id == "xiangqi" else "basic_village"
 	var known_map_name := String(known_room.get("map_name", known_room.get("mapName", ""))).strip_edges()
 	var parsed_map_name := String(parsed.get("mapName", "")).strip_edges()
 	var joined_map_name := known_map_name if known_map_name != "" else parsed_map_name
 	if joined_map_name == "":
-		joined_map_name = "标准村庄"
+		joined_map_name = "标准象棋" if game_id == "xiangqi" else "标准村庄"
 	var bg_source: Dictionary = known_room.duplicate(true) if not known_room.is_empty() else {}
 	bg_source["map_id"] = joined_map_id
 	if String(parsed.get("bg", "")).strip_edges() != "":
@@ -131,7 +132,9 @@ func _join_room_from_payload(payload: String, interactive: bool = false) -> bool
 		"id": room_id,
 		"name": String(parsed.get("roomName", "狼人杀房间")),
 		"state": "等待同步",
-		"type": _type_for_game_id(String(parsed.get("gameId", "werewolf"))),
+		"type": _type_for_game_id(game_id),
+		"game_room_id": game_id,
+		"gameId": game_id,
 		"players": "0/%d" % max_players,
 		"lock": "密码" if String(parsed.get("joinToken", "")).strip_edges() != "" else "公开",
 		"address": "%s:%d" % [String(parsed.get("host", "")), int(parsed.get("port", 0))],
@@ -766,10 +769,21 @@ func _network_player_identity_payload(payload: Dictionary, display_name: String)
 func _game_id_for_room_type(game_type: String) -> String:
 	if game_type == "狼人杀":
 		return "werewolf"
+	if game_type == "象棋":
+		return "xiangqi"
 	return game_type.to_lower()
+
+
+func _game_id_for_room(room: Dictionary) -> String:
+	var explicit := String(room.get("game_room_id", room.get("gameId", ""))).strip_edges()
+	if explicit != "":
+		return "xiangqi" if explicit == "象棋" else explicit
+	return _game_id_for_room_type(String(room.get("type", "狼人杀")))
 
 
 func _type_for_game_id(game_id: String) -> String:
 	if game_id == "werewolf":
 		return "狼人杀"
+	if game_id == "xiangqi":
+		return "象棋"
 	return game_id

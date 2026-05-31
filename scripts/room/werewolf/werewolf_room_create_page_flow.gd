@@ -1,5 +1,7 @@
 extends "res://scripts/room/werewolf/werewolf_room_table_page_flow.gd"
 
+const XiangqiMapCatalogScript := preload("res://scripts/room/xiangqi/xiangqi_map_catalog.gd")
+
 
 func _open_create_room() -> void:
 	var popup := _book_popup("", Vector2(1000, 640), func(): _clear_modal())
@@ -9,40 +11,32 @@ func _open_create_room() -> void:
 	left.add_theme_constant_override("separation", 9)
 	right.add_theme_constant_override("separation", 6)
 
-	var maps: Array = _engine.get_map_list()
-	if maps.is_empty():
-		maps.append({"id": "basic_village", "name": "标准村庄", "supported_player_counts": [6]})
+	var werewolf_maps: Array = _engine.get_map_list()
+	if werewolf_maps.is_empty():
+		werewolf_maps.append({"id": "basic_village", "name": "标准村庄", "supported_player_counts": [6]})
+	var xiangqi_maps: Array = XiangqiMapCatalogScript.new().get_map_list()
+	if xiangqi_maps.is_empty():
+		xiangqi_maps.append({"id": "xiangqi_standard", "name": "标准象棋", "supported_player_counts": [2]})
+	var maps_holder := {"items": werewolf_maps}
 	var selected_game := {"value": "狼人杀"}
 	var selected_map := {"index": 0}
-	var selected_count := {"value": _first_supported_count(maps, 0)}
+	var selected_count := {"value": _first_supported_count(maps_holder["items"], 0)}
 	var compression_enabled := {"value": false}
-	var game_buttons: Array = []
+	var clock_enabled := {"value": false}
 	var count_buttons: Array = []
 	var refresh_maps := {"fn": Callable()}
 	var refresh_counts := {"fn": Callable()}
 
-	var refresh_game_buttons := func() -> void:
-		for item in game_buttons:
-			if item is Button:
-				_style_create_choice_button(item as Button, String((item as Button).get_meta("value", "")) == String(selected_game["value"]))
-
 	left.add_child(_create_section_label("玩法"))
-	var game_row := HFlowContainer.new()
-	game_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	game_row.add_theme_constant_override("h_separation", 14)
-	game_row.add_theme_constant_override("v_separation", 10)
-	left.add_child(game_row)
-	for game in ["狼人杀"]:
-		var game_value := String(game)
-		var button := _create_choice_button(game_value, game_value, Vector2(124, 38), 17, "mode")
-		button.pressed.connect(func():
-			_play_click()
-			selected_game["value"] = game_value
-			refresh_game_buttons.call()
-		)
-		game_buttons.append(button)
-		game_row.add_child(button)
-	refresh_game_buttons.call()
+	var game_select := OptionButton.new()
+	game_select.name = "CreateRoomGameSelect"
+	game_select.custom_minimum_size = Vector2(190, 34)
+	_style_create_room_option(game_select)
+	game_select.add_item("狼人杀")
+	game_select.set_item_metadata(0, "狼人杀")
+	game_select.add_item("象棋")
+	game_select.set_item_metadata(1, "象棋")
+	left.add_child(_create_room_control_row("玩法", game_select, "", 190.0, 48.0))
 
 	left.add_child(_create_section_label("席位"))
 	var count_row := HFlowContainer.new()
@@ -55,9 +49,10 @@ func _open_create_room() -> void:
 			count_row.remove_child(child)
 			child.queue_free()
 		count_buttons.clear()
+		var maps: Array = maps_holder["items"]
 		var counts := _supported_counts_for_selected_map(maps, int(selected_map["index"]))
 		if counts.is_empty():
-			counts = [6]
+			counts = [2] if String(selected_game["value"]) == "象棋" else [6]
 		if not counts.has(int(selected_count["value"])):
 			selected_count["value"] = int(counts[0])
 		for count_value_item in counts:
@@ -91,20 +86,54 @@ func _open_create_room() -> void:
 	left.add_child(_create_section_label("AI"))
 	var compression_check := _create_room_checkbox_row(left, "压缩", false, "启用")
 	compression_check.name = "TimelineCompressionCheck"
+	var compression_check_row := compression_check.get_parent() as Control
 	var compression_model := _create_room_model_dropdown()
 	compression_model.name = "TimelineCompressionModel"
-	left.add_child(_create_room_control_row("模型", compression_model, "", 190.0, 48.0))
+	var compression_model_row := _create_room_control_row("模型", compression_model, "", 190.0, 48.0)
+	left.add_child(compression_model_row)
 	var compression_interval := _create_room_text_line(left, "间隔", str(AppState.DEFAULT_TIMELINE_COMPRESSION_INTERVAL), "轮", 74.0, 48.0)
 	compression_interval.name = "TimelineCompressionInterval"
+	var compression_interval_row := compression_interval.get_parent() as Control
 	var max_output_tokens := _create_room_text_line(left, "输出", str(AppState.DEFAULT_ROOM_MAX_OUTPUT_TOKENS), "tokens", 98.0, 48.0)
 	max_output_tokens.name = "RoomMaxOutputTokens"
+	var max_output_tokens_row := max_output_tokens.get_parent() as Control
+	var clock_check := _create_room_checkbox_row(left, "计时", false, "启用")
+	clock_check.name = "XiangqiClockCheck"
+	var clock_check_row := clock_check.get_parent() as Control
+	var clock_minutes := OptionButton.new()
+	clock_minutes.name = "XiangqiClockMinutes"
+	clock_minutes.custom_minimum_size = Vector2(120, 32)
+	_style_create_room_option(clock_minutes)
+	for minutes in [5, 10, 15, 20, 30]:
+		clock_minutes.add_item("%d分钟" % minutes)
+		clock_minutes.set_item_metadata(clock_minutes.item_count - 1, minutes * 60000)
+	clock_minutes.select(1)
+	var clock_row := _create_room_control_row("时长", clock_minutes, "", 120.0, 48.0)
+	left.add_child(clock_row)
 	var refresh_compression_controls := func() -> void:
-		compression_model.disabled = not bool(compression_enabled["value"])
-		compression_interval.editable = bool(compression_enabled["value"])
-		compression_model.modulate = Color(1, 1, 1, 1) if bool(compression_enabled["value"]) else Color(1, 1, 1, 0.52)
-		compression_interval.modulate = Color(1, 1, 1, 1) if bool(compression_enabled["value"]) else Color(1, 1, 1, 0.52)
+		var is_xiangqi := String(selected_game["value"]) == "象棋"
+		if compression_check_row != null:
+			compression_check_row.visible = not is_xiangqi
+		compression_model_row.visible = not is_xiangqi
+		if compression_interval_row != null:
+			compression_interval_row.visible = not is_xiangqi
+		if max_output_tokens_row != null:
+			max_output_tokens_row.visible = not is_xiangqi
+		compression_model.disabled = is_xiangqi or not bool(compression_enabled["value"])
+		compression_interval.editable = (not is_xiangqi) and bool(compression_enabled["value"])
+		compression_model.modulate = Color(1, 1, 1, 1) if bool(compression_enabled["value"]) and not is_xiangqi else Color(1, 1, 1, 0.52)
+		compression_interval.modulate = Color(1, 1, 1, 1) if bool(compression_enabled["value"]) and not is_xiangqi else Color(1, 1, 1, 0.52)
+		if clock_check_row != null:
+			clock_check_row.visible = is_xiangqi
+		clock_row.visible = is_xiangqi
+		clock_minutes.disabled = not bool(clock_enabled["value"])
+		clock_minutes.modulate = Color(1, 1, 1, 1) if bool(clock_enabled["value"]) else Color(1, 1, 1, 0.52)
 	compression_check.toggled.connect(func(pressed: bool):
 		compression_enabled["value"] = pressed
+		refresh_compression_controls.call()
+	)
+	clock_check.toggled.connect(func(pressed: bool):
+		clock_enabled["value"] = pressed
 		refresh_compression_controls.call()
 	)
 	refresh_compression_controls.call()
@@ -118,6 +147,9 @@ func _open_create_room() -> void:
 	right.add_child(map_slot)
 
 	var select_map_delta := func(delta: int) -> void:
+		var maps: Array = maps_holder["items"]
+		if maps.is_empty():
+			return
 		var next := (int(selected_map["index"]) + delta) % maps.size()
 		if next < 0:
 			next = maps.size() - 1
@@ -132,6 +164,9 @@ func _open_create_room() -> void:
 		for child in map_slot.get_children():
 			map_slot.remove_child(child)
 			child.queue_free()
+		var maps: Array = maps_holder["items"]
+		if maps.is_empty():
+			return
 		var index := int(selected_map["index"])
 		var map_data: Dictionary = maps[index] as Dictionary
 		map_slot.add_child(_map_showcase_card(index, map_data, int(selected_count["value"]), maps.size()))
@@ -159,22 +194,45 @@ func _open_create_room() -> void:
 	)
 
 	(refresh_maps["fn"] as Callable).call()
+	game_select.item_selected.connect(func(index: int):
+		_play_click()
+		var value = game_select.get_item_metadata(index)
+		selected_game["value"] = String(value)
+		maps_holder["items"] = xiangqi_maps if String(selected_game["value"]) == "象棋" else werewolf_maps
+		selected_map["index"] = 0
+		selected_count["value"] = _first_supported_count(maps_holder["items"], 0)
+		var refresh_count_fn: Callable = refresh_counts["fn"]
+		if refresh_count_fn.is_valid():
+			refresh_count_fn.call()
+		var refresh_map_fn: Callable = refresh_maps["fn"]
+		if refresh_map_fn.is_valid():
+			refresh_map_fn.call()
+		refresh_compression_controls.call()
+	)
 	right.add_child(_spacer())
 	var actions := _book_action_row(right)
 	var confirm := _book_button("确认", true, func():
+		var maps: Array = maps_holder["items"]
+		if maps.is_empty():
+			return
 		var selected_map_index := int(selected_map.get("index", 0))
 		if selected_map_index < 0 or selected_map_index >= maps.size():
 			selected_map_index = 0
 		var chosen_map: Dictionary = maps[selected_map_index] as Dictionary
+		var is_xiangqi := String(selected_game["value"]) == "象棋"
 		var room_options := {
-			"timeline_compression_enabled": bool(compression_enabled["value"]),
+			"game_room_id": "xiangqi" if is_xiangqi else "werewolf",
+			"timeline_compression_enabled": (not is_xiangqi) and bool(compression_enabled["value"]),
 			"timeline_compression_model": _create_room_selected_model_name(compression_model),
 			"timeline_compression_interval": _create_room_positive_int(compression_interval.text, AppState.DEFAULT_TIMELINE_COMPRESSION_INTERVAL),
 			"timeline_compression_prompt": AppState.DEFAULT_TIMELINE_COMPRESSION_PROMPT,
 			"bot_max_output_tokens": _create_room_positive_int(max_output_tokens.text, AppState.DEFAULT_ROOM_MAX_OUTPUT_TOKENS),
+			"clock_enabled": is_xiangqi and bool(clock_enabled["value"]),
+			"time_limit_ms": _create_room_selected_metadata_int(clock_minutes, 600000),
 		}
 		_create_room_and_enter(String(selected_game["value"]), int(selected_count["value"]), password.text, String(chosen_map.get("id", "")), String(chosen_map.get("name", "")), room_options)
 	)
+	confirm.name = "CreateRoomConfirmButton"
 	confirm.custom_minimum_size = Vector2(158, 46)
 	_style_create_confirm_button(confirm)
 	actions.add_child(confirm)
@@ -182,13 +240,15 @@ func _open_create_room() -> void:
 		popup_node.tree_exiting.connect(func():
 			refresh_maps["fn"] = Callable()
 			refresh_counts["fn"] = Callable()
-			game_buttons.clear()
 			count_buttons.clear()
-			maps.clear()
+			maps_holder.clear()
+			werewolf_maps.clear()
+			xiangqi_maps.clear()
 			selected_game.clear()
 			selected_count.clear()
 			selected_map.clear()
 			compression_enabled.clear()
+			clock_enabled.clear()
 			swipe.clear()
 		)
 
@@ -382,6 +442,15 @@ func _create_room_positive_int(text: String, default_value: int) -> int:
 	return maxi(1, value)
 
 
+func _create_room_selected_metadata_int(option: OptionButton, default_value: int) -> int:
+	if option == null or option.item_count <= 0:
+		return default_value
+	var index := option.selected
+	if index < 0 or index >= option.item_count:
+		return default_value
+	return int(option.get_item_metadata(index))
+
+
 func _choice_style_box(bg: Color, border: Color, radius: int, width: int, horizontal_margin: int = 12) -> StyleBoxFlat:
 	var box := _style_box(bg, border, radius, width)
 	box.shadow_color = Color(0.18, 0.10, 0.03, 0.18)
@@ -485,6 +554,11 @@ func _map_showcase_card(index: int, map_data: Dictionary, selected_count: int, t
 
 
 func _map_role_counts(map_data: Dictionary, selected_count: int) -> Array:
+	if String(map_data.get("id", "")).strip_edges().begins_with("xiangqi"):
+		return [
+			{"text": "红方 1", "color": BOOK_RED},
+			{"text": "黑方 1", "color": Color(0.12, 0.12, 0.11)},
+		]
 	var roles: Array = []
 	if _engine != null and _engine.has_method("get_role_config"):
 		roles = _engine.get_role_config(String(map_data.get("id", "")), selected_count)
@@ -537,16 +611,21 @@ func _map_plain_text(text: String, color: Color) -> Label:
 
 
 func _map_cover_path(map_id: String) -> String:
+	if map_id.strip_edges().begins_with("xiangqi"):
+		return "res://assets/images/xiangqi/backgrounds/table.svg"
 	return _map_background_path(map_id)
 
 
 func _create_room_and_enter(game_type: String, player_count: int, password: String, map_id: String = "", map_name: String = "", room_options: Dictionary = {}) -> void:
+	var game_room_id := String(room_options.get("game_room_id", "werewolf")).strip_edges()
 	if _app_state != null:
 		var created_room: Dictionary = _app_state.create_room(game_type, player_count, password, map_id, map_name, true, 3, room_options)
-		created_room["bg"] = _map_background_path(String(created_room.get("map_id", map_id)))
+		created_room["bg"] = _room_background_path(created_room)
 		_bind_state()
 	else:
 		var normalized_options := AppState._normalized_room_options(room_options)
+		var fallback_map_id := AppState.XIANGQI_MAP_ID if game_room_id == "xiangqi" else AppState.DEFAULT_MAP_ID
+		var fallback_map_name := AppState.XIANGQI_MAP_NAME if game_room_id == "xiangqi" else AppState.DEFAULT_MAP_NAME
 		var room := {
 			"id": "local_room",
 			"name": "%s房间" % game_type,
@@ -555,11 +634,13 @@ func _create_room_and_enter(game_type: String, player_count: int, password: Stri
 			"players": "0/%d" % player_count,
 			"lock": "密码" if password.strip_edges() != "" else "公开",
 			"address": "本机",
-			"bg": _map_background_path(map_id),
+			"bg": _room_background_path({"game_room_id": game_room_id, "map_id": map_id}),
 			"password": password,
+			"game_room_id": game_room_id,
+			"gameId": game_room_id,
 			"max_players": player_count,
-			"map_id": map_id if map_id.strip_edges() != "" else AppState.DEFAULT_MAP_ID,
-			"map_name": map_name if map_name.strip_edges() != "" else AppState.DEFAULT_MAP_NAME,
+			"map_id": map_id if map_id.strip_edges() != "" else fallback_map_id,
+			"map_name": map_name if map_name.strip_edges() != "" else fallback_map_name,
 		}
 		for key in normalized_options.keys():
 			room[key] = normalized_options[key]

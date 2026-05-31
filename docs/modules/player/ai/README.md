@@ -14,6 +14,7 @@ AI 玩家模块是玩家模块的子模块，负责 AI 玩家这一类控制器�
        -> AI 玩家行为结果统一包装
   -> 具体游戏 AI 玩家模块
        -> 狼人杀 AI 玩家模块
+       -> 象棋 AI 玩家模块
 ```
 
 AI 玩家模块只回答“这个玩家由 AI 控制，如何以玩家身份提交统一结果”。具体游戏 AI 玩家模块负责把游戏上下文、机器人/RAG、模型管理和输出解析组合起来。
@@ -40,5 +41,4 @@ scripts/player/ai/
   ai_player_controller.gd
 ```
 
-具体游戏 AI 玩家实现放在对应游戏目录，例如狼人杀 AI 玩家模块位于 `scripts/player/werewolf/ai/`。
-
+具体游戏 AI 玩家实现放在对应游戏目录，例如狼人杀 AI 玩家模块位于 `scripts/player/werewolf/ai/`，象棋 AI 玩家模块位于 `scripts/player/xiangqi/ai/`。

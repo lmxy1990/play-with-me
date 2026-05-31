@@ -16,6 +16,7 @@
 - 创建房间到房间：统一房间创建请求。
 - 房间到具体游戏房间模块：房间上下文、地图、场景槽位、游戏快照、临时游戏数据。
 - 狼人杀房间模块到狼人杀真人/AI 玩家模块：行动请求和行动结果。
+- 象棋房间模块到象棋真人/AI 玩家模块：行棋、求和、悔棋、认输、聊天请求和行动结果。
 - 狼人杀 AI 玩家模块到机器人/RAG：通用可见上下文和通用记忆更新。
 - 狼人杀 AI 玩家模块到模型管理：一次模型输入输出请求。
 - 房间和玩家模块之间：玩家级可信通道、玩家任务通道、玩家临时数据和断联恢复帧。
@@ -27,6 +28,7 @@
 - 具体 Godot 类名、文件名和函数名。
 - Android 插件内部数据库表。
 - 狼人杀房间模块内部状态的全部字段。
+- 象棋房间模块内部局面、棋谱和计时状态的全部字段。
 - 机器人记忆模块内部存储表、索引、合并算法。
 - 模型供应商私有请求体。
 
@@ -368,6 +370,7 @@ get_scene_slots(game_room_id, map_id, player_count) -> GameRoomSceneSlots
 
 - 房间模块校验 `game_room_id`、`map_id`、`seat_count` 和 `scene_slots` 是否匹配具体游戏房间模块返回的数据。
 - 具体游戏房间模块只消费 `game_room_init_options` 中属于自己的参数。
+- 创建房间 UI 根据所选游戏房间模块展示玩法专属初始化选项；例如象棋使用 `clock_enabled` 作为计时开关，默认 `false`，开启后才提交 `time_limit_ms`，默认 600000。
 - `RoomCreateRequest` 只接受本文定义的当前字段；字段不匹配的请求直接拒绝。
 
 ### RoomJoinRequest
@@ -699,6 +702,94 @@ get_scene_slots(game_room_id, map_id, player_count) -> GameRoomSceneSlots
 - 只有 `ok = true` 的结果可以触发记忆更新和 TTS。
 - 只有 `ok = true` 的结果可以驱动 `effect_requests`、阶段推进和下一步行动请求。
 - `private_events` 交给房间按可见性下发，不进入公开历史。
+
+### XiangqiActionRequest
+
+象棋房间模块下发给象棋真人玩家模块或象棋 AI 玩家模块的行动请求。真人和 AI 玩家使用同一种请求。
+
+| 字段 | 说明 |
+| --- | --- |
+| `schema_version` | 结构版本。 |
+| `turn_id` | 行动请求 ID。 |
+| `room_id` | 房间 ID。 |
+| `actor_player_id` | 当前行动玩家 ID。 |
+| `actor_seat_number` | 当前行动座位。 |
+| `side` | 当前行动方，`red` 或 `black`。 |
+| `instruction_type` | 指令类型，例如 `board_move`、`confirm`、`speech_input`、`chat_response`。 |
+| `action_type` | `move`、`resign`、`draw_offer`、`draw_response`、`undo_offer`、`undo_response`、`chat` 等。 |
+| `board_state` | 当前玩家可见棋盘状态。象棋默认公开，但仍不得包含通道和模型私有数据。 |
+| `move_history` | 当前玩家可见棋谱。 |
+| `legal_moves` | 当前可选合法走法数组，可选。 |
+| `chat_context` | 聊天请求使用的公开发言上下文，可选。 |
+| `clock_state` | 当前棋钟状态；仅 `clock_enabled = true` 时存在。 |
+| `options` | 求和、悔棋、认输等可选操作。 |
+| `time_limit_ms` | 行动超时，可选；仅计时开启时生效。 |
+| `metadata` | 象棋房间模块补充信息。 |
+
+约定：
+
+- `move` 请求只发给当前行棋方。
+- `chat_response` 只在真人公开发言被接受后触发，不能替代走棋请求。
+- `draw_response` 和 `undo_response` 请求发给对手，必须显式返回同意或拒绝。
+- 权威坐标使用红方视角，UI 旋转展示前后都必须转换回权威坐标提交。
+- `legal_moves` 用于 UI 和 AI 候选输入，不替代象棋房间模块最终校验。
+- `actor_player_id` 只用于房间模块、玩家模块和可信通道内部路由校验；映射到模型请求时必须移除。
+
+### XiangqiPlayerActionResult
+
+真人和 AI 机器人都必须返回同一种象棋行动结果。
+
+| 字段 | 说明 |
+| --- | --- |
+| `schema_version` | 结构版本。 |
+| `turn_id` | 对应行动请求 ID。 |
+| `room_id` | 房间 ID。 |
+| `actor_seat_number` | 行动者座位编号。 |
+| `side` | 行动方，`red` 或 `black`。 |
+| `action_type` | `move`、`resign`、`draw_offer`、`draw_accept`、`draw_decline`、`undo_offer`、`undo_accept`、`undo_decline`、`chat` 等。 |
+| `from` | 走棋起点，结构为 `{file, rank}`，仅 `move` 使用。 |
+| `to` | 走棋终点，结构为 `{file, rank}`，仅 `move` 使用。 |
+| `speech_text` | 聊天文本，可选。 |
+| `source` | `human`、`ai_model`。 |
+| `confidence` | AI 置信度，可选。 |
+| `model_request_id` | AI 结果对应的模型请求 ID，可选。 |
+| `metadata` | 输出解析、错误、模型请求等附加信息。 |
+| `error` | 失败时的结构化错误。 |
+
+约定：
+
+- 行动结果不直接修改棋盘，必须提交给象棋房间模块校验。
+- `move` 结果必须使用权威坐标，不使用屏幕坐标。
+- `chat` 结果只进入聊天链路，不推进棋局、不切换行棋方。
+- AI 输出解析失败时返回结构化错误，不提交为象棋行动。
+- 象棋房间模块拒绝的行动不得进入棋谱、历史、TTS 或记忆。
+
+### XiangqiRuleUpdateResult
+
+象棋房间模块接受行动后的更新结果。
+
+| 字段 | 说明 |
+| --- | --- |
+| `ok` | 是否接受并应用。 |
+| `room_id` | 房间 ID。 |
+| `accepted_action` | 被接受的 `XiangqiPlayerActionResult`，可脱敏。 |
+| `board_state_patch` | 棋盘状态变更摘要。 |
+| `move_record` | 被接受的棋谱记录，可选。 |
+| `clock_state_patch` | 棋钟状态变更摘要，仅计时开启时存在。 |
+| `public_events` | 公开事件，例如走棋、吃子、将军、胜负、求和和悔棋。 |
+| `history_entries` | 可写入可见历史的条目。 |
+| `temporary_game_data` | 需要下发的临时数据。 |
+| `effect_requests` | 本次接受结果对应的展示特效请求。 |
+| `next_action_request` | 下一步 `XiangqiActionRequest`，可选。 |
+| `game_over` | 是否结束。 |
+| `replay_data_ref` | 复盘数据引用，可选。 |
+| `error` | 拒绝原因。 |
+
+约定：
+
+- 只有 `ok = true` 的结果可以写入棋谱、历史、TTS 和记忆。
+- 只有 `ok = true` 的结果可以驱动棋盘特效、胜负展示和下一步行动请求。
+- 聊天接受结果可以产生历史和 TTS，但不能产生棋盘状态补丁。
 
 ## 机器人/RAG 契约
 
@@ -1431,6 +1522,9 @@ WerewolfRuleUpdateResult(ok = true)
 | `RoomReplicaFrame` | 房间模块 / 真人参与者客户端 | 主机选举、重连恢复 | 房间模块和具体游戏房间模块共同校验恢复能力 |
 | `WerewolfActionRequest` | 狼人杀房间模块 | 狼人杀真人/AI 玩家模块 | 狼人杀房间模块 |
 | `WerewolfPlayerActionResult` | 狼人杀真人/AI 玩家模块 | 狼人杀房间模块 | 狼人杀房间模块 |
+| `XiangqiActionRequest` | 象棋房间模块 | 象棋真人/AI 玩家模块 | 象棋房间模块 |
+| `XiangqiPlayerActionResult` | 象棋真人/AI 玩家模块 | 象棋房间模块 | 象棋房间模块 |
+| `XiangqiRuleUpdateResult` | 象棋房间模块 | 房间模块、房间 UI、玩家适配层 | 象棋房间模块 |
 | `BotProfile` | 机器人/RAG 模块 | 具体游戏 AI 机器人玩家适配层 | 机器人/RAG 模块 |
 | `BotVisibleContext` | 业务玩家适配层 | 机器人/RAG 模块 | 适配层负责脱敏，机器人做防线校验 |
 | `memory_update` | 业务玩家适配层 | 机器人/RAG 模块 | 适配层负责来源确认，记忆模块负责写入规则 |

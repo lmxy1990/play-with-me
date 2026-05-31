@@ -14,7 +14,7 @@ Play With Me 是一个 Godot 4.6 Mobile 横屏桌游应用。当前核心玩法�
 RoomSession
   -> 参与者、席位、生命周期、网络和临时存储
   -> 委派具体游戏房间模块
-       -> WerewolfRoom / 后续三国杀房间、围棋房间、象棋房间、麻将房间
+       -> WerewolfRoom / XiangqiRoom / 后续三国杀房间、围棋房间、麻将房间
        -> 提供地图 / 支持人数 / 场景槽位
        -> 根据地图 ID 和人数选择内部编排
        -> 生成 GameActionRequest
@@ -42,7 +42,7 @@ PlayerController
 抽象层次约定：
 
 - 房间模块是通用运行容器，负责收集参与者和玩家数据、维护房间生命周期、发送玩家交互请求、按下发范围广播事件、保存临时历史，并支持主机重选和主机接管。
-- 具体游戏房间模块是房间委派的玩法和布局实现，负责按地图 ID 和人数选择内部编排，并决定行动接受后的特效请求、阶段推进和下一步行动请求。狼人杀房间只是当前实现；后续三国杀房间、围棋房间、象棋房间和麻将房间应接入同一房间容器。
+- 具体游戏房间模块是房间委派的玩法和布局实现，负责按地图 ID 和人数选择内部编排，并决定行动接受后的特效请求、阶段推进和下一步行动请求。狼人杀房间是当前实现，象棋房间按同一容器新增；后续三国杀房间、围棋房间和麻将房间应接入同一房间容器。
 - 玩家模块是玩家侧公共运行层，由父级玩家模块、真人玩家模块、AI 玩家模块、狼人杀真人玩家模块、狼人杀 AI 玩家模块共同组成；它负责通用玩家资料、运行时绑定、玩家级可信通道、玩家任务通道、玩家临时数据、断联恢复、展示 ACK 状态、行为控制器入口和公共 TTS 文本转语音接口。真人玩家模块处理人类输入投递和结果回收，AI 玩家模块处理 AI 控制器入口和通用结果包装；调用玩家模块播报时，由调用实现传入本次使用的音色 ID。
 - 具体游戏玩家实现负责把通用玩家行为和具体游戏房间对象互相转换，例如狼人杀真人玩家模块和狼人杀 AI 玩家模块。新增具体游戏时，主要新增对应游戏房间模块、真人玩家实现模块和 AI 玩家实现模块，其它能力通过公共模块接口复用。
 
@@ -120,6 +120,9 @@ scripts/room/network/
 scripts/room/werewolf/
   狼人杀房间模块、资源目录、页面状态、页面、座位、桌面、效果和私聊
 
+scripts/room/xiangqi/
+  象棋房间模块、棋盘、规则校验、页面状态、页面、座位、聊天和复盘
+
 scripts/android/
   Godot 到 Android 插件的桥接
 
@@ -141,6 +144,7 @@ scripts/ui/
 | 小编织模块 | 创建房间模块 | [create-room/README.md](modules/create-room/README.md) | 统一创建 UI 编排；读取可创建游戏房间模块、地图、支持人数和场景槽位，提交 `RoomCreateRequest`；当前入口在 `scripts/pages/lobby_page.gd` |
 | 大编织模块 | 房间模块 | [room/README.md](modules/room/README.md) | 通用房间运行容器；维护参与者、席位、玩家交互、事件广播、玩家 inbox、可见历史下载、重连、真人副本、主机重选、主机接管和具体游戏房间模块接入点；`scenes/werewolf_room.tscn`、`scripts/room/`、`scripts/room/network/room_network_session.gd`、`scripts/room/network/host_election.gd` |
 | 大编织模块 | 狼人杀房间模块 | [room/werewolf/README.md](modules/room/werewolf/README.md) | 当前具体游戏房间实现；按地图 ID 和人数选择内部编排并输出特效请求、阶段推进和下一步行动请求；`scripts/room/werewolf/werewolf_engine.gd`、`scripts/room/werewolf/werewolf_asset_catalog.gd`、`scripts/room/werewolf/` |
+| 大编织模块 | 象棋房间模块 | [room/xiangqi/README.md](modules/room/xiangqi/README.md) | 新增具体游戏房间设计；维护 2 人座位、竖版棋盘、权威局面、走法校验、回合推进、胜负与和棋、AI 聊天触发和复盘；目标归属 `scripts/room/xiangqi/` |
 
 ## 工程结构和模块结构
 
@@ -168,7 +172,9 @@ scripts/ui/
 - 房间会话、快照、重连和主机选举放 `scripts/room/network/`，设计归属按房间模块维护；二维码 payload、加密协商和认证基础在 `scripts/network/`、`scripts/ui/` 和 `scripts/android/` 等路径协作实现，设计归属按基础能力维护。
 - 玩家通用逻辑放 `scripts/player/`，包括玩家资料、玩家工厂、真人玩家控制器、AI 玩家控制器和具体游戏玩家实现。`scripts/room/room_runtime.gd` 仍归房间模块，负责人数、准备、换座、加机器人和改名等房间级规则。
 - 狼人杀房间模块专属逻辑放 `scripts/room/werewolf/`。
+- 象棋房间模块专属逻辑放 `scripts/room/xiangqi/`。
 - 狼人杀真人玩家实现归 `scripts/player/werewolf/human/`，狼人杀 AI 玩家实现归 `scripts/player/werewolf/ai/`。
+- 象棋真人玩家实现归 `scripts/player/xiangqi/human/`，象棋 AI 玩家实现归 `scripts/player/xiangqi/ai/`。
 - Android 原生能力放 `android_plugins/play_with_me_android/`，Godot 桥接放 `scripts/android/`。
 - 测试、demo 资产和调试脚本放 `test/`。
 

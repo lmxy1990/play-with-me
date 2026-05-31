@@ -5,8 +5,12 @@ const SAVE_PATH := "user://play_with_me_state.json"
 const STATE_VERSION := 6
 
 const WerewolfAssetCatalogScript := preload("res://scripts/room/werewolf/werewolf_asset_catalog.gd")
+const XiangqiAssetCatalogScript := preload("res://scripts/room/xiangqi/xiangqi_asset_catalog.gd")
+const XiangqiEngineScript := preload("res://scripts/room/xiangqi/xiangqi_engine.gd")
 const DEFAULT_MAP_ID := "basic_village"
 const DEFAULT_MAP_NAME := "标准村庄"
+const XIANGQI_MAP_ID := "xiangqi_standard"
+const XIANGQI_MAP_NAME := "标准象棋"
 const DEFAULT_ROOM_MAX_OUTPUT_TOKENS := 2000
 const DEFAULT_TIMELINE_COMPRESSION_INTERVAL := 8
 const DEFAULT_TIMELINE_COMPRESSION_PROMPT := "把以下时间线转化为事实，减短内容。"
@@ -25,6 +29,7 @@ var phase_night := false
 var active_room_id := ""
 var system_message := "等待创建房间"
 var werewolf: Dictionary = {}
+var xiangqi: Dictionary = {}
 var history: Array = []
 var device_identity_json: Dictionary = {}
 var persistence_enabled := true
@@ -66,9 +71,16 @@ func to_json() -> Dictionary:
 
 func create_room(game_type: String, player_count: int, password: String, map_id: String = "", map_name: String = "", allow_observers: bool = true, max_observers: int = 3, room_options: Dictionary = {}) -> Dictionary:
 	var id := "room_%d" % Time.get_ticks_usec()
+	var game_room_id := _game_room_id_for_create(game_type, room_options)
 	var normalized_map_id := map_id.strip_edges()
 	var normalized_map_name := map_name.strip_edges()
 	var normalized_room_options := _normalized_room_options(room_options)
+	normalized_room_options["game_room_id"] = game_room_id
+	normalized_room_options["gameId"] = game_room_id
+	if normalized_map_id == "":
+		normalized_map_id = XIANGQI_MAP_ID if game_room_id == "xiangqi" else DEFAULT_MAP_ID
+	if normalized_map_name == "":
+		normalized_map_name = XIANGQI_MAP_NAME if game_room_id == "xiangqi" else DEFAULT_MAP_NAME
 	var room := {
 		"id": id,
 		"name": "%s房间" % game_type,
@@ -77,14 +89,18 @@ func create_room(game_type: String, player_count: int, password: String, map_id:
 		"players": "0/%d" % player_count,
 		"lock": "密码" if password.strip_edges() != "" else "公开",
 		"address": "本机",
-		"bg": map_background_path(DEFAULT_MAP_ID if normalized_map_id == "" else normalized_map_id),
+		"bg": map_background_path_for_game(game_room_id, normalized_map_id),
 		"password": password,
+		"game_room_id": game_room_id,
+		"gameId": game_room_id,
+		"min_players": player_count,
 		"max_players": player_count,
 		"allow_observers": allow_observers,
 		"max_observers": clampi(max_observers, 0, 3),
 		"max_participants": player_count + clampi(max_observers, 0, 3),
-		"map_id": DEFAULT_MAP_ID if normalized_map_id == "" else normalized_map_id,
-		"map_name": DEFAULT_MAP_NAME if normalized_map_name == "" else normalized_map_name,
+		"map_id": normalized_map_id,
+		"map_name": normalized_map_name,
+		"enable_timers": bool(normalized_room_options.get("clock_enabled", false)),
 	}
 	for key in normalized_room_options.keys():
 		room[key] = normalized_room_options[key]
@@ -95,14 +111,19 @@ func create_room(game_type: String, player_count: int, password: String, map_id:
 		players.append(empty_seat_data(i))
 	local_player_index = -1
 	system_message = "房间已创建"
-	reset_game_flow()
+	reset_game_flow(game_room_id, normalized_room_options)
 	save()
 	return room
 
 
-func reset_game_flow() -> void:
+func reset_game_flow(game_room_id: String = "werewolf", room_options: Dictionary = {}) -> void:
 	phase_night = false
-	werewolf = _default_werewolf_state()
+	if game_room_id == "xiangqi":
+		werewolf = {}
+		xiangqi = XiangqiEngineScript.new().default_state(room_options)
+	else:
+		werewolf = _default_werewolf_state()
+		xiangqi = {}
 	history.clear()
 
 
@@ -131,9 +152,13 @@ func update_active_room_counts() -> void:
 			capacity = maxi(capacity, players.size())
 			room["max_participants"] = capacity
 			room["players"] = "%d/%d" % [occupied + observers, capacity]
-			if String(werewolf.get("phase", "lobby")) in ["post_game_summary", "mvp_vote", "completed"]:
+			var game_room_id := _game_room_id_for_room(room)
+			var game_state := xiangqi if game_room_id == "xiangqi" else werewolf
+			if game_room_id == "xiangqi" and String(game_state.get("phase", "lobby")) == "completed":
 				room["state"] = "已结束"
-			elif bool(werewolf.get("started", false)):
+			elif game_room_id != "xiangqi" and String(game_state.get("phase", "lobby")) in ["post_game_summary", "mvp_vote", "completed"]:
+				room["state"] = "已结束"
+			elif bool(game_state.get("started", false)):
 				room["state"] = "游戏中"
 			else:
 				room["state"] = "等待中"
@@ -182,10 +207,10 @@ func _normalize_rooms() -> void:
 		if rooms[i] is Dictionary:
 			var room: Dictionary = (rooms[i] as Dictionary)
 			if not room.has("map_id"):
-				room["map_id"] = DEFAULT_MAP_ID
+				room["map_id"] = XIANGQI_MAP_ID if _game_room_id_for_room(room) == "xiangqi" else DEFAULT_MAP_ID
 			if not room.has("map_name"):
-				room["map_name"] = DEFAULT_MAP_NAME
-			room["bg"] = map_background_path(String(room.get("map_id", DEFAULT_MAP_ID)))
+				room["map_name"] = XIANGQI_MAP_NAME if _game_room_id_for_room(room) == "xiangqi" else DEFAULT_MAP_NAME
+			room["bg"] = map_background_path_for_game(_game_room_id_for_room(room), String(room.get("map_id", DEFAULT_MAP_ID)))
 			var options := _normalized_room_options(room)
 			for key in options.keys():
 				room[key] = options[key]
@@ -205,10 +230,17 @@ func _clear_room_runtime_state() -> void:
 	active_room_id = ""
 	system_message = "等待创建房间"
 	werewolf = _default_werewolf_state()
+	xiangqi = {}
 	history.clear()
 
 
 func map_background_path(map_id: String) -> String:
+	return WerewolfAssetCatalogScript.map_background_path(map_id)
+
+
+func map_background_path_for_game(game_room_id: String, map_id: String) -> String:
+	if game_room_id == "xiangqi":
+		return XiangqiAssetCatalogScript.map_background_path(map_id)
 	return WerewolfAssetCatalogScript.map_background_path(map_id)
 
 
@@ -229,6 +261,7 @@ func _apply_defaults() -> void:
 	active_room_id = ""
 	system_message = "等待创建房间"
 	werewolf = _default_werewolf_state()
+	xiangqi = {}
 	history = []
 
 
@@ -238,23 +271,48 @@ func _default_rooms() -> Array:
 
 static func default_room_options() -> Dictionary:
 	return {
+		"game_room_id": "werewolf",
 		"timeline_compression_enabled": false,
 		"timeline_compression_model": "",
 		"timeline_compression_interval": DEFAULT_TIMELINE_COMPRESSION_INTERVAL,
 		"timeline_compression_prompt": DEFAULT_TIMELINE_COMPRESSION_PROMPT,
 		"bot_max_output_tokens": DEFAULT_ROOM_MAX_OUTPUT_TOKENS,
+		"clock_enabled": false,
+		"time_limit_ms": 600000,
 	}
 
 
 static func _normalized_room_options(options: Dictionary) -> Dictionary:
 	var result := default_room_options()
+	var game_room_id := String(options.get("game_room_id", options.get("gameId", result["game_room_id"]))).strip_edges()
+	result["game_room_id"] = "xiangqi" if game_room_id == "xiangqi" or game_room_id == "象棋" else "werewolf"
 	result["timeline_compression_enabled"] = bool(options.get("timeline_compression_enabled", result["timeline_compression_enabled"]))
 	result["timeline_compression_model"] = String(options.get("timeline_compression_model", result["timeline_compression_model"])).strip_edges()
 	result["timeline_compression_interval"] = maxi(1, int(options.get("timeline_compression_interval", result["timeline_compression_interval"])))
 	var prompt := String(options.get("timeline_compression_prompt", result["timeline_compression_prompt"])).strip_edges()
 	result["timeline_compression_prompt"] = prompt if prompt != "" else DEFAULT_TIMELINE_COMPRESSION_PROMPT
 	result["bot_max_output_tokens"] = maxi(1, int(options.get("bot_max_output_tokens", result["bot_max_output_tokens"])))
+	result["clock_enabled"] = bool(options.get("clock_enabled", options.get("enableTimers", result["clock_enabled"])))
+	result["time_limit_ms"] = maxi(60000, int(options.get("time_limit_ms", options.get("timeLimitMs", result["time_limit_ms"]))))
 	return result
+
+
+static func _game_room_id_for_create(game_type: String, room_options: Dictionary = {}) -> String:
+	var explicit := String(room_options.get("game_room_id", room_options.get("gameId", ""))).strip_edges()
+	if explicit == "xiangqi" or explicit == "象棋":
+		return "xiangqi"
+	if explicit == "werewolf" or explicit == "狼人杀":
+		return "werewolf"
+	return "xiangqi" if game_type.strip_edges() == "象棋" else "werewolf"
+
+
+static func _game_room_id_for_room(room: Dictionary) -> String:
+	var explicit := String(room.get("game_room_id", room.get("gameId", ""))).strip_edges()
+	if explicit == "xiangqi" or explicit == "象棋":
+		return "xiangqi"
+	if explicit == "werewolf" or explicit == "狼人杀":
+		return "werewolf"
+	return "xiangqi" if String(room.get("type", "")).strip_edges() == "象棋" else "werewolf"
 
 
 func _default_model_configs() -> Array:

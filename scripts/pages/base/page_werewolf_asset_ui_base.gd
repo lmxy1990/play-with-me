@@ -1,6 +1,7 @@
 extends "res://scripts/ui/base/page_ui_base.gd"
 
 const WerewolfAssetCatalogScript := preload("res://scripts/room/werewolf/werewolf_asset_catalog.gd")
+const XiangqiAssetCatalogScript := preload("res://scripts/room/xiangqi/xiangqi_asset_catalog.gd")
 
 
 func _lobby_background_path() -> String:
@@ -32,6 +33,9 @@ func _map_background_path(map_id: String) -> String:
 
 
 func _room_background_path(room: Dictionary) -> String:
+	var game_id := String(room.get("game_room_id", room.get("gameId", ""))).strip_edges()
+	if game_id == "xiangqi" or game_id == "象棋" or String(room.get("type", "")).strip_edges() == "象棋":
+		return XiangqiAssetCatalogScript.room_background_path(room)
 	return WerewolfAssetCatalogScript.room_background_path(room)
 
 

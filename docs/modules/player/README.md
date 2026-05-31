@@ -30,7 +30,7 @@
        -> 请求 TTS 语音模块播报
 ```
 
-当前玩家模块由 5 个模块共同组成：
+当前玩家模块由父级玩家、通用真人/AI 控制器和具体游戏玩家适配模块共同组成：
 
 | 模块 | 文档 | 职责 |
 | --- | --- | --- |
@@ -39,6 +39,8 @@
 | AI 玩家模块 | [ai](ai/README.md) | 通用 AI 控制器；定义 AI 玩家控制器入口、机器人引用和统一玩家行为结果包装。 |
 | 狼人杀真人玩家模块 | [werewolf/human](werewolf/human/README.md) | 具体游戏真人玩家实现；把狼人杀行动、发言、目标选择请求转成人能操作的 UI 输入。 |
 | 狼人杀 AI 玩家模块 | [werewolf/ai](werewolf/ai/README.md) | 具体游戏 AI 玩家实现；构建狼人杀 AI 上下文、prompt/schema，调用模型并解析输出。 |
+| 象棋真人玩家模块 | [xiangqi/human](xiangqi/human/README.md) | 具体游戏真人玩家实现；把象棋走棋、求和、悔棋、认输和聊天请求转成人能操作的 UI 输入。 |
+| 象棋 AI 玩家模块 | [xiangqi/ai](xiangqi/ai/README.md) | 具体游戏 AI 玩家实现；构建象棋行棋上下文和聊天上下文，调用模型并解析输出。 |
 
 旧的 `docs/modules/room/werewolf/player/` 只保留历史迁移指针；狼人杀玩家实现的权威文档归入本目录下的 `werewolf/human` 和 `werewolf/ai`。
 
@@ -618,6 +620,14 @@ scripts/player/
     ai/
       werewolf_ai_player_factory.gd
       ai_werewolf_*.gd
+  xiangqi/
+    human/
+      xiangqi_human_player_factory.gd
+      xiangqi_human_player_interaction_controller.gd
+      xiangqi_human_player_task_controller.gd
+    ai/
+      xiangqi_ai_player_factory.gd
+      ai_xiangqi_*.gd
 ```
 
 `scripts/room/room_runtime.gd` 仍属于房间模块，因为它维护房间人数、准备、换座、加机器人等房间级规则，不归玩家模块。当前狼人杀真人行动任务状态、结果 payload、目标确认、发言编辑、名字编辑、座位详情、头像旁白开关视图和真人玩家本地状态结果已收敛到 `scripts/player/werewolf/human/`；房间页面保留座位点击、网络请求、房间状态刷新和游戏推进桥接。

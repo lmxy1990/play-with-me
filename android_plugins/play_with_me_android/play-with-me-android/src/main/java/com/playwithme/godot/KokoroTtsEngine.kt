@@ -2,7 +2,10 @@ package com.playwithme.godot
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import org.json.JSONArray
@@ -33,9 +36,15 @@ internal class KokoroTtsEngine(
     private val assetDir = "tts/kokoro-int8-multi-lang-v1_1"
     private val waveDir = File(context.cacheDir, "tts_waves")
     private val lock = Any()
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
+        AndroidDebugLog.d(TAG, "audioFocus changed change=$change")
+    }
 
     private var runtimeHandle: Long = 0L
     private var mediaPlayer: MediaPlayer? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private var hasAudioFocus = false
     private var playbackGeneration = 0
     private var waveSequence = 0
     private var currentPlaybackLatch: CountDownLatch? = null
@@ -380,22 +389,19 @@ internal class KokoroTtsEngine(
                 return@post
             }
             try {
-                synchronized(lock) {
+                val focusResult = synchronized(lock) {
                     stopMediaPlayerLocked()
+                    requestPlaybackAudioFocusLocked()
                 }
                 val player = MediaPlayer().apply {
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_GAME)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build()
-                    )
+                    setAudioAttributes(playbackAudioAttributes())
                     setVolume(volume, volume)
                     setDataSource(file.absolutePath)
                     setOnCompletionListener {
                         synchronized(lock) {
                             if (mediaPlayer === it) {
                                 mediaPlayer = null
+                                abandonPlaybackAudioFocusLocked()
                             }
                         }
                         it.release()
@@ -405,6 +411,7 @@ internal class KokoroTtsEngine(
                         synchronized(lock) {
                             if (mediaPlayer === mp) {
                                 mediaPlayer = null
+                                abandonPlaybackAudioFocusLocked()
                             }
                         }
                         mp.release()
@@ -422,8 +429,11 @@ internal class KokoroTtsEngine(
                 }
                 player.start()
                 schedulePlaybackProgress(player, utteranceId, generation, baseRatio, ratioSpan)
-                AndroidDebugLog.d(TAG, "playWave start utterance=$utteranceId file=${file.name} durationMs=$durationMs")
+                AndroidDebugLog.d(TAG, "playWave start utterance=$utteranceId file=${file.name} durationMs=$durationMs volume=$volume focusResult=$focusResult")
             } catch (error: Exception) {
+                synchronized(lock) {
+                    abandonPlaybackAudioFocusLocked()
+                }
                 AndroidDebugLog.d(TAG, "playWave failed utterance=$utteranceId error=${error.message}", error)
                 listener.onSpeechFailed(utteranceId, error.message ?: "本地 Kokoro 播放失败")
                 latch.countDown()
@@ -483,6 +493,54 @@ internal class KokoroTtsEngine(
         )
     }
 
+    private fun playbackAudioAttributes(): AudioAttributes {
+        return AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+    }
+
+    private fun requestPlaybackAudioFocusLocked(): Int {
+        val manager = audioManager ?: return AudioManager.AUDIOFOCUS_REQUEST_FAILED
+        abandonPlaybackAudioFocusLocked()
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(playbackAudioAttributes())
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .setWillPauseWhenDucked(false)
+                .build()
+            audioFocusRequest = request
+            manager.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            manager.requestAudioFocus(
+                audioFocusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+            )
+        }
+        hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        AndroidDebugLog.d(TAG, "audioFocus request result=$result granted=$hasAudioFocus")
+        return result
+    }
+
+    private fun abandonPlaybackAudioFocusLocked() {
+        val manager = audioManager ?: return
+        val request = audioFocusRequest
+        if (!hasAudioFocus && request == null) {
+            return
+        }
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && request != null) {
+            manager.abandonAudioFocusRequest(request)
+        } else {
+            @Suppress("DEPRECATION")
+            manager.abandonAudioFocus(audioFocusChangeListener)
+        }
+        AndroidDebugLog.d(TAG, "audioFocus abandon result=$result")
+        audioFocusRequest = null
+        hasAudioFocus = false
+    }
+
     private fun stopMediaPlayerLocked() {
         val player = mediaPlayer ?: return
         mediaPlayer = null
@@ -491,6 +549,7 @@ internal class KokoroTtsEngine(
         } catch (_: IllegalStateException) {
         }
         player.release()
+        abandonPlaybackAudioFocusLocked()
     }
 
     private fun isCanceled(generation: Int): Boolean {

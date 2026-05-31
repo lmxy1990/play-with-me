@@ -198,24 +198,29 @@ func app_room_from_discovery(room: Dictionary) -> Dictionary:
 	var requires_token := bool(room.get("requiresJoinToken", false))
 	var game_id := String(room.get("gameId", "werewolf"))
 	var map_id := String(room.get("mapId", room.get("map_id", ""))).strip_edges()
-	var map_name := String(room.get("mapName", room.get("map_name", "标准村庄"))).strip_edges()
+	var map_name := String(room.get("mapName", room.get("map_name", "标准村庄" if game_id != "xiangqi" else "标准象棋"))).strip_edges()
 	var bg := String(room.get("bg", "res://assets/images/werewolf/backgrounds/lobby.png")).strip_edges()
+	var default_map_id := "xiangqi_standard" if game_id == "xiangqi" else "basic_village"
+	var default_map_name := "标准象棋" if game_id == "xiangqi" else "标准村庄"
+	var default_bg := "res://assets/images/xiangqi/backgrounds/table.svg" if game_id == "xiangqi" else "res://assets/images/werewolf/backgrounds/lobby.png"
 	return {
 		"id": String(room.get("roomId", "")),
-		"name": String(room.get("roomName", "狼人杀房间")),
+		"name": String(room.get("roomName", "象棋房间" if game_id == "xiangqi" else "狼人杀房间")),
 		"state": "游戏中" if bool(room.get("gameStarted", false)) else "等待中",
 		"type": _type_for_game_id(game_id),
+		"game_room_id": game_id,
+		"gameId": game_id,
 		"players": "%d/%d" % [participants, max(0, max_participants)],
 		"lock": "密码" if requires_token else "公开",
 		"address": "%s:%d" % [String(room.get("host", "")), int(room.get("port", 0))],
-		"bg": bg if bg != "" else "res://assets/images/werewolf/backgrounds/lobby.png",
+		"bg": bg if bg != "" else default_bg,
 		"max_players": max_players,
 		"allow_observers": bool(room.get("allowObservers", true)),
 		"max_observers": int(room.get("maxObservers", 3)),
 		"max_participants": max_participants,
 		"active_bot_profile_ids": [],
-		"map_id": "basic_village" if map_id == "" else map_id,
-		"map_name": "标准村庄" if map_name == "" else map_name,
+		"map_id": default_map_id if map_id == "" else map_id,
+		"map_name": default_map_name if map_name == "" else map_name,
 		"host": String(room.get("host", "")),
 		"port": int(room.get("port", 0)),
 		"host_device_id": String(room.get("hostDeviceId", "")),
@@ -227,15 +232,15 @@ func app_room_from_discovery(room: Dictionary) -> Dictionary:
 			"host": String(room.get("host", "")),
 			"port": int(room.get("port", 0)),
 			"roomId": String(room.get("roomId", "")),
-			"roomName": String(room.get("roomName", "狼人杀房间")),
+			"roomName": String(room.get("roomName", "象棋房间" if game_id == "xiangqi" else "狼人杀房间")),
 			"gameId": game_id,
 			"asObserver": false,
 			"joinToken": "",
 			"hostDeviceId": String(room.get("hostDeviceId", "")),
 			"hostPublicKey": String(room.get("hostPublicKey", "")),
-			"mapId": "basic_village" if map_id == "" else map_id,
-			"mapName": "标准村庄" if map_name == "" else map_name,
-			"bg": bg if bg != "" else "res://assets/images/werewolf/backgrounds/lobby.png",
+			"mapId": default_map_id if map_id == "" else map_id,
+			"mapName": default_map_name if map_name == "" else map_name,
+			"bg": bg if bg != "" else default_bg,
 		}),
 		"discovered": true,
 	}
@@ -269,11 +274,14 @@ func room_from_state(room: Dictionary, players: Array, host: String, port: int, 
 				"seatNumber": 0,
 			})
 	var game_type := String(room.get("type", "狼人杀"))
+	var game_id := String(room.get("game_room_id", room.get("gameId", _game_id_for_type(game_type)))).strip_edges()
+	if game_id == "":
+		game_id = _game_id_for_type(game_type)
 	var requires_token := String(room.get("password", "")).strip_edges() != "" or String(room.get("lock", "")) == "密码"
 	return {
 		"roomId": String(room.get("id", "")),
 		"roomName": String(room.get("name", "狼人杀房间")),
-		"gameId": _game_id_for_type(game_type),
+		"gameId": game_id,
 		"host": host,
 		"port": port,
 		"minPlayers": int(room.get("min_players", 6)),
@@ -363,12 +371,16 @@ func _prune_stale_rooms() -> void:
 func _game_id_for_type(game_type: String) -> String:
 	if game_type == "狼人杀":
 		return "werewolf"
+	if game_type == "象棋":
+		return "xiangqi"
 	return game_type.to_lower()
 
 
 func _type_for_game_id(game_id: String) -> String:
 	if game_id == "werewolf":
 		return "狼人杀"
+	if game_id == "xiangqi":
+		return "象棋"
 	return game_id
 
 

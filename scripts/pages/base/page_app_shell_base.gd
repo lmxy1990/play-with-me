@@ -71,7 +71,10 @@ func _enter_table() -> void:
 	_bind_state()
 	if has_method("_initialize_controlled_bot_model_profiles"):
 		call("_initialize_controlled_bot_model_profiles", "enter_table", true)
-	navigate_requested.emit("table", {})
+	var route := _route_for_active_room()
+	navigate_requested.emit(route, {})
+	if route != "table":
+		return
 	_show_table()
 
 
@@ -87,3 +90,11 @@ func _build_table_hud() -> void:
 
 func _flash_effect(kind: String) -> void:
 	_effect_layer.play(kind)
+
+
+func _route_for_active_room() -> String:
+	var room := _active_room()
+	var game_id := String(room.get("game_room_id", room.get("gameId", ""))).strip_edges()
+	if game_id == "xiangqi" or game_id == "象棋" or String(room.get("type", "")).strip_edges() == "象棋":
+		return "xiangqi_table"
+	return "table"

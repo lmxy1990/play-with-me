@@ -3,6 +3,7 @@ extends Control
 const PAGE_SCENES := {
 	"lobby": "res://scenes/lobby.tscn",
 	"table": "res://scenes/werewolf_room.tscn",
+	"xiangqi_table": "res://scenes/xiangqi_room.tscn",
 	"preferences": "res://scenes/preferences.tscn",
 	"model_config": "res://scenes/model_config.tscn",
 	"voice_config": "res://scenes/voice_config.tscn",

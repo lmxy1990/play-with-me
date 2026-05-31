@@ -264,18 +264,30 @@ func _host_update_peer_participant(peer_id: int, payload: Dictionary) -> void:
 
 
 func _host_mark_peer_left(peer_id: int, explicit_leave: bool = false) -> void:
-	var participant_id := String(_room_network_session.call("peer_participant_id", peer_id))
+	var participant_id := ""
+	if _room_network_session != null and _room_network_session.has_method("peer_participant_id"):
+		participant_id = String(_room_network_session.call("peer_participant_id", peer_id)).strip_edges()
 	var active_room_id := String(_app_state.active_room_id) if _app_state != null else String(_active_room().get("id", ""))
-	var should_destroy_room := false
 	var players := _state_array("_players")
 	var index := _seat_for_participant_id(participant_id)
+	if OS.is_debug_build():
+		_network_debug("host peer_left start peer=%d explicit=%s participant=%s seat=%d room=%s peers=%s people=%s" % [
+			peer_id,
+			str(explicit_leave),
+			participant_id,
+			index,
+			active_room_id,
+			_host_peer_debug_snapshot_text(),
+			_host_room_people_debug_snapshot_text(),
+		])
 	if index >= 0 and index < players.size():
 		var player: Dictionary = (players[index] as Dictionary).duplicate(true)
 		var display_name := String(player.get("name", "玩家"))
 		if explicit_leave:
 			var empty_value = _call_if_present("_empty_seat_data", [index])
 			players[index] = empty_value if empty_value is Dictionary else {}
-			_room_network_session.call("set_peer_participant", peer_id, "", -1, "")
+			if _room_network_session != null and _room_network_session.has_method("set_peer_participant"):
+				_room_network_session.call("set_peer_participant", peer_id, "", -1, "")
 			_set_system_message("%s 已离开房间" % display_name)
 		else:
 			player["state"] = "离线"
@@ -289,8 +301,23 @@ func _host_mark_peer_left(peer_id: int, explicit_leave: bool = false) -> void:
 		if participant_id != "":
 			_call_if_present("_host_drop_presentation_ack_participant", [participant_id])
 			_call_if_present("_host_drop_device_task_participant", [participant_id])
-		should_destroy_room = explicit_leave and bool(_call_if_present("_active_room_has_no_people"))
+		if OS.is_debug_build():
+			_network_debug("host peer_left applied peer=%d explicit=%s participant=%s cleared_seat=%d room=%s people=%s" % [
+				peer_id,
+				str(explicit_leave),
+				participant_id,
+				index if explicit_leave else -1,
+				active_room_id,
+				_host_room_people_debug_snapshot_text(),
+			])
+		var should_destroy_room := explicit_leave and bool(_call_if_present("_active_room_has_no_people"))
 		if should_destroy_room and active_room_id != "":
+			if OS.is_debug_build():
+				_network_debug("host peer_left destroy_empty_room peer=%d participant=%s room=%s" % [
+					peer_id,
+					participant_id,
+					active_room_id,
+				])
 			_call_if_present("_destroy_active_room", [active_room_id])
 			return
 		_call_if_present("_refresh_all_seats")
@@ -301,12 +328,75 @@ func _host_mark_peer_left(peer_id: int, explicit_leave: bool = false) -> void:
 	var room := _active_room()
 	if _remove_observer(room, participant_id):
 		if explicit_leave:
-			_room_network_session.call("set_peer_participant", peer_id, "", -1, "")
+			if _room_network_session != null and _room_network_session.has_method("set_peer_participant"):
+				_room_network_session.call("set_peer_participant", peer_id, "", -1, "")
 			_set_system_message("观察者已离开")
 		else:
 			_set_system_message("观察者离线")
+		if OS.is_debug_build():
+			_network_debug("host peer_left observer peer=%d explicit=%s participant=%s room=%s people=%s" % [
+				peer_id,
+				str(explicit_leave),
+				participant_id,
+				active_room_id,
+				_host_room_people_debug_snapshot_text(),
+			])
+		var should_destroy_room := explicit_leave and bool(_call_if_present("_active_room_has_no_people"))
+		if should_destroy_room and active_room_id != "":
+			if OS.is_debug_build():
+				_network_debug("host peer_left observer_destroy_empty_room peer=%d participant=%s room=%s" % [
+					peer_id,
+					participant_id,
+					active_room_id,
+				])
+			_call_if_present("_destroy_active_room", [active_room_id])
+			return
 		_call_if_present("_refresh_room_controls")
 		_call_if_present("_commit_state")
+
+
+func _host_peer_debug_snapshot_text() -> String:
+	if _room_network_session == null:
+		return "[]"
+	if _room_network_session.has_method("peer_debug_snapshot"):
+		return JSON.stringify(_room_network_session.call("peer_debug_snapshot"))
+	if _room_network_session.has_method("peer_ids"):
+		return str(_room_network_session.call("peer_ids"))
+	return "[]"
+
+
+func _host_room_people_debug_snapshot_text() -> String:
+	var seats := []
+	var players := _state_array("_players")
+	for i in range(players.size()):
+		if not (players[i] is Dictionary):
+			continue
+		var player: Dictionary = players[i]
+		var owner := String(player.get("owner", "")).strip_edges()
+		var participant := String(player.get("participant_id", player.get("participantId", ""))).strip_edges()
+		var controller := String(player.get("controller_participant_id", player.get("controllerParticipantId", ""))).strip_edges()
+		if owner == "" and participant == "" and controller == "":
+			continue
+		seats.append({
+			"seat": i,
+			"name": String(player.get("name", "")),
+			"owner": owner,
+			"participant": participant,
+			"controller": controller,
+			"state": String(player.get("state", "")),
+		})
+	var observers := []
+	var room := _active_room()
+	var observer_values = room.get("observers", [])
+	if observer_values is Array:
+		for observer_value in observer_values as Array:
+			if observer_value is Dictionary:
+				var observer: Dictionary = observer_value
+				observers.append({
+					"id": String(observer.get("id", observer.get("participantId", ""))),
+					"name": String(observer.get("displayName", observer.get("name", ""))),
+				})
+	return JSON.stringify({"seats": seats, "observers": observers})
 
 
 func _first_empty_seat() -> int:

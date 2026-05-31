@@ -2,9 +2,11 @@ extends RefCounted
 
 const WerewolfHumanPlayerFactoryScript := preload("res://scripts/player/werewolf/human/werewolf_human_player_factory.gd")
 const WerewolfAiPlayerFactoryScript := preload("res://scripts/player/werewolf/ai/werewolf_ai_player_factory.gd")
+const XiangqiAiPlayerFactoryScript := preload("res://scripts/player/xiangqi/ai/xiangqi_ai_player_factory.gd")
 
 var _werewolf_human_factory = WerewolfHumanPlayerFactoryScript.new()
 var _werewolf_ai_factory = WerewolfAiPlayerFactoryScript.new()
+var _xiangqi_ai_factory = XiangqiAiPlayerFactoryScript.new()
 
 
 func self_player(participant_id: String, display_name: String, idle_motion: int = 0) -> Dictionary:
@@ -32,6 +34,13 @@ func bot_player(bot_serial: int, bot_name: String, controller_participant_id: St
 func bot_player_from_profile(bot_serial: int, profile: Dictionary, controller_participant_id: String, room_players: Array = [], ignore_index: int = -1, idle_motion: int = 0) -> Dictionary:
 	var initialized := _initialized_bot_identity(profile, room_players, ignore_index, bot_serial)
 	return _werewolf_ai_factory.bot_player_from_identity(bot_serial, initialized, controller_participant_id, idle_motion)
+
+
+func xiangqi_bot_player_from_profile(bot_serial: int, profile: Dictionary, controller_participant_id: String, room_players: Array = [], ignore_index: int = -1, idle_motion: int = 0) -> Dictionary:
+	var initialized := _initialized_bot_identity(profile, room_players, ignore_index, bot_serial)
+	if String(profile.get("model", "")).strip_edges() != "":
+		initialized["model"] = String(profile.get("model", "")).strip_edges()
+	return _xiangqi_ai_factory.bot_player_from_identity(bot_serial, initialized, controller_participant_id, idle_motion)
 
 
 func empty_seat(index: int, idle_motion: int = 0) -> Dictionary:
