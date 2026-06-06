@@ -1,0 +1,8 @@
+# wei_xiahoudun / 夏侯惇
+Target output: assets/images/sanguosha/generals/standard_adult_female/wei_xiahoudun.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Xiahou Dun, clearly 33-year-old adult woman, fierce battle-hardened face, one eye covered by a stylish black leather eyepatch, strong jawline, short dark blue-black hair with an undercut, aggressive warrior stance. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing steel-blue armor, open chest leather corset, short armored skirt, ripped black thigh-high stockings, tactical garter straps, scar details on shoulder and cheek, heavy curved sword resting beside her. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, stormy battlefield background, hard dramatic lighting, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

@@ -1,0 +1,8 @@
+# wei_zhangliao / 张辽
+Target output: assets/images/sanguosha/generals/standard_adult_female/wei_zhangliao.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Zhang Liao, clearly 28-year-old adult woman, disciplined sharp face, focused grey eyes, straight black hair tied into a high military ponytail with silver rings, calm elite general expression. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing navy-and-silver officer armor, open chest fitted corset, short military battle skirt, black thigh-high stockings, silver garters, twin short blades at her hips, clean tactical posture. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, Wei military camp background, crisp morning light, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

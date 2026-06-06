@@ -1,0 +1,8 @@
+# shu_zhugeliang / 诸葛亮
+Target output: assets/images/sanguosha/generals/standard_adult_female/shu_zhugeliang.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Zhuge Liang, clearly 34-year-old adult woman, intelligent refined face, pale skin, calm narrow eyes, long ink-black hair flowing under a delicate strategist headpiece, serene mysterious expression. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing ivory-and-teal strategist robe, open neckline silk corset, translucent sleeves, high-slit layered skirt, sheer black thigh-high stockings, jade garter ornaments, feather fan held away from her face and torso, subtle scroll and star motifs. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, elegant moonlit study background, soft lantern light, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

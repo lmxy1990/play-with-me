@@ -1,0 +1,8 @@
+# wei_simayi / 司马懿
+Target output: assets/images/sanguosha/generals/standard_adult_female/wei_simayi.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Sima Yi, clearly 36-year-old adult woman, cold elegant face, narrow dark eyes, thin confident smile, long raven hair with silver streaks, low braided ponytail, mysterious strategist aura. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing black-purple court robe armor, open chest corset, high-slit silk skirt, sheer purple thigh-high stockings, black garter belt, long gloves, holding a dark feather fan and a chess piece. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, shadowy war room background, cool purple cinematic lighting, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

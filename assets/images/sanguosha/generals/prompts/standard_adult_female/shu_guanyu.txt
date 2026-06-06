@@ -1,0 +1,8 @@
+# shu_guanyu / 关羽
+Target output: assets/images/sanguosha/generals/standard_adult_female/shu_guanyu.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Guan Yu, clearly 32-year-old adult woman, heroic sharp face, high cheekbones, phoenix eyes, proud calm expression, long dark crimson hair tied into a high warrior ponytail with loose front strands. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing red-and-bronze battle dress, open chest armored corset, short asymmetrical war skirt, sheer black thigh-high stockings, leather garters, red cloak flowing behind, ornate gold shoulder guards, holding a green dragon polearm upright beside her body, not blocking face or torso. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, cinematic rim light, battlefield dusk background, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

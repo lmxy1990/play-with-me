@@ -1,0 +1,8 @@
+# shu_machao / 马超
+Target output: assets/images/sanguosha/generals/standard_adult_female/shu_machao.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Ma Chao, clearly 27-year-old adult woman, proud western frontier beauty, sharp amber eyes, sun-kissed skin, long platinum-blonde hair braided with blue beads, confident cavalry commander stance. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing blue-and-silver nomad cavalry armor, open chest corset, short armored riding skirt, black thigh-high stockings, blue garters, fur-trimmed shoulder cape, ornate spear and horse-themed accessories. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, windy desert pass background, golden sunset light, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

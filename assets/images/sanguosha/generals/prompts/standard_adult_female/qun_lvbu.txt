@@ -1,0 +1,8 @@
+# qun_lvbu / 吕布
+Target output: assets/images/sanguosha/generals/standard_adult_female/qun_lvbu.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Lu Bu, clearly 30-year-old adult woman, dominant terrifying beauty, sharp red-brown eyes, fierce angular face, long black hair with crimson streaks in a high wild ponytail, horn-like gold headpiece, unstoppable warrior expression. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing black-red demon cavalry armor, open chest armored corset, short jagged war skirt, black thigh-high stockings, red leather garters, massive halberd standing beside her, red cloak and metal ornaments. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, chaotic battlefield background, dramatic red lightning light, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

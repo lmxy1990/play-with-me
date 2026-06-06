@@ -1,0 +1,8 @@
+# wei_caocao / 曹操
+Target output: assets/images/sanguosha/generals/standard_adult_female/wei_caocao.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Cao Cao, clearly 38-year-old adult woman, commanding mature beauty, sharp eyes, defined cheekbones, confident calculating smile, glossy black hair in a regal high bun with gold crown ornaments. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing black-and-gold imperial armor dress, open chest armored corset, short black war skirt, sheer black thigh-high stockings, gold garters, heavy royal cloak, one hand on a sheathed sword, dominant queenly posture. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, dark palace throne background, dramatic gold light, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

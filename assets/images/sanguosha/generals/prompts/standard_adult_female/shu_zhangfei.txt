@@ -1,0 +1,8 @@
+# shu_zhangfei / 张飞
+Target output: assets/images/sanguosha/generals/standard_adult_female/shu_zhangfei.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Zhang Fei, clearly 29-year-old adult woman, fierce round eyes, strong brows, athletic curvy build, tanned skin, wild black wavy hair with a high messy topknot, intense battle shout expression. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing black-and-red leather armor, open chest reinforced bustier, short torn warrior skirt, fishnet thigh-high stockings, heavy leather garters, spiked bracers, holding a serpent spear diagonally behind her shoulders. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, dramatic firelight, smoky battlefield background, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

@@ -1,0 +1,8 @@
+# qun_diaochan / 貂蝉
+Target output: assets/images/sanguosha/generals/standard_adult_female/qun_diaochan.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Diao Chan, clearly 25-year-old adult woman, seductive dancer beauty, delicate face, long lashes, violet eyes, soft confident smile, very long black hair in ornate flowing dancer style with silver flower ornaments. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing purple-and-pink dancer outfit, open chest jeweled corset, translucent silk ribbons, high-slit short skirt, sheer black thigh-high stockings, silver garter chains, holding silk dance fans away from face and torso. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, luxurious moonlit palace stage background, romantic cinematic light, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

@@ -1,0 +1,8 @@
+# shu_liubei / 刘备
+Target output: assets/images/sanguosha/generals/standard_adult_female/shu_liubei.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female warlord Liu Bei, clearly 28-year-old adult woman, gentle noble face, warm almond eyes, soft oval face, long chestnut hair in an elegant half-up imperial braid, jade hairpin, confident benevolent expression. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing emerald-and-gold hanfu armor, open neckline, fitted corset bodice, short layered silk skirt, black thigh-high stockings, gold garter straps, delicate shoulder armor, jade pendant, holding twin ceremonial swords at her sides without covering her body. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, cinematic studio lighting, sharp focus, luxurious ancient Chinese palace background, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

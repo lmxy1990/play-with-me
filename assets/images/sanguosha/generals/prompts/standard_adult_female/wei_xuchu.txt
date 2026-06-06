@@ -1,0 +1,8 @@
+# wei_xuchu / 许褚
+Target output: assets/images/sanguosha/generals/standard_adult_female/wei_xuchu.png
+
+Positive prompt:
+Photorealistic full-body vertical portrait, original Three Kingdoms inspired adult female Xu Chu, clearly 31-year-old adult woman, powerful curvy physique, broad shoulders, confident earthy face, thick brows, warm brown eyes, short chestnut hair in a rough warrior bob, bold fearless smile. R18+ adult glamour game character, very large natural breasts, mostly bare breasts with nipples concealed by fabric, jewelry, hair, or armor, underboob and sideboob, ultra-revealing dark leather heavy-guard armor, open chest armored bustier, short rugged skirt, opaque black thigh-high stockings, wide garter belt, fur shoulder pelt, massive war hammer held down at one side. Adult erotic glamour, lower body suggestively visible through translucent silk or shadowed fabric without clear genital detail, realistic skin texture, fortress gate background, warm torch light, full body centered, 2:3 game card composition, no text, no watermark.
+
+Negative prompt:
+underage, child, teen, loli, school uniform, childish face, petite childlike body, old man, beard, male body, visible nipples, exposed genitals, detailed vagina, explicit sex act, porn scene, spread legs focus, gore, pregnant, deformed hands, extra fingers, missing fingers, bad anatomy, blurry, low resolution, anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person

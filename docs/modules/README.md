@@ -26,7 +26,8 @@
   -> 委派具体游戏房间模块
        -> 狼人杀房间模块
        -> 象棋房间模块
-       -> 后续三国杀房间 / 围棋房间 / 麻将房间
+       -> 三国杀房间模块
+       -> 后续围棋房间 / 麻将房间
 
 玩家模块
   -> 通用玩家资料 / 运行时绑定 / 玩家级可信通道
@@ -61,6 +62,17 @@
   -> 控制设备从本机模型数据库读取完整 ModelProfile
   -> 分离构建象棋行棋上下文和聊天上下文
   -> 解析模型输出为 PlayerActionResult / XiangqiPlayerActionResult 或聊天文本
+
+三国杀真人玩家模块
+  -> 把 SanguoshaActionRequest 转成手牌选择、目标选择、弃牌、响应和濒死求桃输入
+  -> 把真人操作转成 PlayerActionResult / SanguoshaPlayerActionResult
+
+三国杀 AI 玩家模块
+  -> 从机器人档案读取 model_profile_name / voice_profile_id
+  -> 控制设备从本机模型数据库读取完整 ModelProfile
+  -> 读取三国杀房间模块提供的 visible_state、legal_actions 和 response_window
+  -> 只在规则引擎给出的合法动作集合中选择 action_id
+  -> 解析模型输出为 PlayerActionResult / SanguoshaPlayerActionResult
 
 玩家发言
   -> TTS 语音模块：文本转语音
@@ -120,6 +132,7 @@
 | 房间模块 | [room](room/README.md) | 通用房间运行容器；维护参与者、席位、玩家交互、事件广播、玩家 inbox、可见历史下载、重连、真人副本、主机重选、主机接管和具体游戏房间模块接入点。 |
 | 狼人杀房间模块 | [room/werewolf](room/werewolf/README.md) | 当前具体游戏房间实现；维护狼人杀地图、支持人数、场景槽位、内部编排、状态机、行动请求、行动校验、特效请求、阶段推进、事件 payload、下发语义、胜负判断和复盘回合。 |
 | 象棋房间模块 | [room/xiangqi](room/xiangqi/README.md) | 新增具体游戏房间设计；维护象棋地图、两方座位、竖版棋盘布局、权威局面、走法校验、回合推进、胜负与和棋判定、聊天触发和复盘。 |
+| 三国杀房间模块 | [room/sanguosha](room/sanguosha/README.md) | 后续具体游戏房间设计；维护 2 人对决、4-8 人身份局、规则包、武将包、牌堆、手牌、响应窗口、合法动作、伤害濒死结算、可见性快照、胜负判断和复盘。 |
 
 ## 调用关系
 
