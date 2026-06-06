@@ -10,14 +10,14 @@ COMMON_STYLE = (
     "original Three Kingdoms inspired {inspiration} reimagined as a woman, "
     "{face}, {hair}, {body}, large natural bust,her nipples stand erect, {cleavage}, "
     "exposed nipples and genitals  "
-    "underage, child, teen, young-looking, loli, school uniform, childish face, petite childlike body, "
-    "beard, visible nipples, exposed areola, exposed genitals, visible vulva, explicit sex act, "
-    "intercourse, oral sex, penetration, porn scene, spread legs focus, "
+    "underage, teen, young-looking, loli, school uniform, childish face"
+    "visible nipples, exposed areola, exposed genitals, visible vulva, explicit sex act, "
     "{outfit}. Pose: {pose}. {background}, cinematic lighting, realistic skin texture, sharp focus, "
     "full body centered, head and feet not cropped, clean empty space in the upper right corner and lower left corner "
 )
 
 NEGATIVE_PROMPT = (
+    "child,petite childlike body,beard,intercourse, oral sex, penetration, porn scene, spread legs focus, "
     "male body,toy insertion,gore,pregnant"
     "bad anatomy, deformed hands, extra fingers, missing fingers, distorted body, blurry, low resolution, "
     "anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person"
@@ -351,8 +351,6 @@ GENERALS = [
         "bust": "exposed nipples and genitals ",
     },
 ]
-
-
 
 
 def prompt_text(general: dict) -> str:
