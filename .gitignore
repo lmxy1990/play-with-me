@@ -1,6 +1,7 @@
 # Godot local cache
 .godot/
 .godot_user/
+.idea/
 
 # User-excluded project folders
 # Build caches and generated outputs inside source trees

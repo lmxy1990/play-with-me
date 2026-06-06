@@ -1,0 +1,390 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+PROMPT_DIR = ROOT / "assets" / "images" / "sanguosha" / "generals" / "prompts" / "standard_adult_female"
+GENERAL_OUTPUT_DIR = ROOT / "assets" / "images" / "sanguosha" / "generals" / "standard_adult_female"
+
+COMMON_STYLE = (
+    "original Three Kingdoms inspired {inspiration} reimagined as a woman, "
+    "{face}, {hair}, {body}, large natural bust,her nipples stand erect, {cleavage}, "
+    "exposed nipples and genitals  "
+    "underage, child, teen, young-looking, loli, school uniform, childish face, petite childlike body, "
+    "beard, visible nipples, exposed areola, exposed genitals, visible vulva, explicit sex act, "
+    "intercourse, oral sex, penetration, porn scene, spread legs focus, "
+    "{outfit}. Pose: {pose}. {background}, cinematic lighting, realistic skin texture, sharp focus, "
+    "full body centered, head and feet not cropped, clean empty space in the upper right corner and lower left corner "
+)
+
+NEGATIVE_PROMPT = (
+    "male body,toy insertion,gore,pregnant"
+    "bad anatomy, deformed hands, extra fingers, missing fingers, distorted body, blurry, low resolution, "
+    "anime, cartoon, 3d render, plastic skin, text, logo, watermark, duplicate person"
+)
+
+GENERALS = [
+    {
+        "id": "shu_liubei",
+        "name": "刘备",
+        "inspiration": "Liu Bei",
+        "age": 28,
+        "face": "gentle noble face, warm almond eyes, soft oval face",
+        "hair": "long chestnut hair in a half-up imperial braid with jade hairpins",
+        "body": "very curvy body with a warm mature silhouette",
+        "outfit": "black thigh-high stockings, gold garter straps, delicate shoulder armor, jade pendant, twin ceremonial swords",
+        "pose": "graceful benevolent ruler stance, one hand resting on her hip, the other hand holding twin ceremonial swords lowered beside her body, relaxed S-curve posture, calm confident gaze",
+        "background": "luxurious ancient palace background with warm gold lanterns",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "shu_guanyu",
+        "name": "关羽",
+        "inspiration": "Guan Yu",
+        "age": 32,
+        "face": "dignified mature beauty, sharp phoenix eyes, defined cheekbones",
+        "hair": "long dark red hair tied into a high warrior ponytail with green silk cords",
+        "body": "powerful curvy body with heroic shoulders and narrow waist",
+        "outfit": "high-slit armored skirt, sheer black thigh-high stockings, heavy boots, jade tassels, bronze arm guards, guandao polearm",
+        "pose": "dramatic over-the-shoulder twist, torso turned toward viewer, one hand gripping a guandao behind her shoulder, the other adjusting a flowing sleeve, proud calm expression",
+        "background": "misty battlefield gate background with banners and rim light",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "shu_zhangfei",
+        "name": "张飞",
+        "inspiration": "Zhang Fei",
+        "age": 27,
+        "face": "fierce wild beauty, strong brows, intense dark eyes, tan skin",
+        "hair": "voluminous black hair in a messy high ponytail with red battle ribbons",
+        "body": "athletic curvy body with strong thighs and waist",
+        "outfit": "short rugged battle skirt, torn silk sash, fishnet thigh-high stockings, red garters, heavy bracers, serpent spear",
+        "pose": "aggressive warrior stance with feet planted wide, one knee bent, long serpent spear angled diagonally across the scene, one hand pointing forward as if challenging an enemy, fierce open-mouthed shout",
+        "background": "dusty battlefield background with sparks and smoky backlight",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "shu_zhaoyun",
+        "name": "赵云",
+        "inspiration": "Zhao Yun",
+        "age": 25,
+        "face": "heroic refined face, bright focused eyes, pale skin",
+        "hair": "long silver-black hair flowing from a high ponytail with a blue crystal hair ornament",
+        "body": "graceful athletic curves with a clean fighter silhouette",
+        "outfit": "white and azure lamellar armor, short blue silk battle skirt, white thigh-high stockings, silver garters, light cape streaming behind her, long spear",
+        "pose": "dynamic spear lunge, one foot forward, waist twisted, spear extended diagonally past the viewer, free hand balancing behind her, determined calm gaze",
+        "background": "mountain pass battlefield background with wind and banners",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "shu_machao",
+        "name": "马超",
+        "inspiration": "Ma Chao",
+        "age": 26,
+        "face": "proud cavalry queen, sharp blue-gray eyes, high nose bridge",
+        "hair": "long platinum hair braided with silver horsehair tassels",
+        "body": "tall curvy body with a commanding rider silhouette",
+        "cleavage": "elegant covered cleavage",
+        "outfit": "silver and black cavalry armor, black thigh-high riding stockings, silver garter belts, spurred boots, fur-trimmed cape, long spear",
+        "pose": "cavalry command pose, leaning back slightly against a long spear planted on the ground, one boot on a low stone step, hips angled, chin raised, commanding gaze",
+        "background": "western pass fortress background with horse silhouette, saddle gear, cold sunlight, and dust",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "shu_zhugeliang",
+        "name": "诸葛亮",
+        "inspiration": "Zhuge Liang",
+        "age": 30,
+        "face": "elegant strategist beauty, calm intelligent eyes, slender mature face",
+        "hair": "long ink-black hair in a loose scholar bun with white jade ornaments",
+        "body": "refined curvy body with graceful posture",
+        "outfit": "translucent outer sleeves, short layered robe skirt, sheer white thigh-high stockings, silver waist chains, feather fan",
+        "pose": "seated sideways on a low silk divan, one leg folded on the seat and the other touching the floor, torso upright, feather fan held near shoulder, composed knowing smile",
+        "background": "candlelit strategy chamber background with maps, bamboo slips, and moonlight",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "shu_huangyueying",
+        "name": "黄月英",
+        "inspiration": "Huang Yueying",
+        "age": 24,
+        "face": "clever inventor beauty, amber eyes, small confident smile",
+        "hair": "long honey-blonde hair in an asymmetrical braid with brass mechanical hairpins",
+        "body": "curvy adult body with a playful engineer silhouette",
+        "outfit": "fitted bodice with tiny gear ornaments, black lace thigh-high stockings, leather garters, tool belt, delicate arm guards",
+        "pose": "kneeling inventor pose beside a compact wooden mechanical crossbow device, one hand adjusting a brass gear, the other holding a blueprint scroll, looking up at the viewer with playful confidence",
+        "background": "workshop courtyard background with lanterns and wooden mechanisms",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wei_caocao",
+        "name": "曹操",
+        "inspiration": "Cao Cao",
+        "age": 38,
+        "face": "commanding mature beauty, sharp eyes, defined cheekbones",
+        "hair": "glossy black hair in a regal high bun with gold crown ornaments",
+        "body": "queenly curvy body with a dominant ruler silhouette",
+        "outfit": "open-collar armored corset, sheer black thigh-high stockings, gold garters, heavy royal cloak, sheathed sword",
+        "pose": "seated on a dark throne with legs crossed, one elbow on the armrest, one hand holding a folded command fan, chin lifted with a calculating smile; a closed lacquered boudoir prop box and silk ribbons sit on a side table as decorative background details, not being used",
+        "background": "dark palace throne room background with dramatic gold light",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wei_simayi",
+        "name": "司马懿",
+        "inspiration": "Sima Yi",
+        "age": 36,
+        "face": "cold intelligent mature beauty, narrow dark eyes, pale skin",
+        "hair": "long straight black hair with one silver streak and an obsidian hairpin",
+        "body": "tall curvy body with a narrow-waist strategist silhouette",
+        "outfit": "translucent dark sleeves, high-slit layered skirt, sheer black thigh-high stockings, silver garter chains, raven-feather shoulder ornament",
+        "pose": "leaning against a carved palace pillar with arched back and one knee slightly bent, one hand holding a black feather fan near her lips, the other hand trailing along a chessboard table, secretive smile",
+        "background": "candlelit strategy hall background with cool violet shadows",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wei_xiahoudun",
+        "name": "夏侯惇",
+        "inspiration": "Xiahou Dun",
+        "age": 34,
+        "face": "battle-scarred mature beauty, one eye covered by an elegant black eyepatch, fierce amber eye",
+        "hair": "short dark brown hair swept back with metal clips",
+        "body": "strong curvy body with a battle-ready stance",
+        "outfit": "black thigh-high stockings, red garters, scarred bracers, heavy sword",
+        "pose": "low crouching warrior stance on broken stone, one hand braced on a sword hilt, other hand pulling a leather glove tight, intense forward stare, powerful hips and shoulders angled dynamically",
+        "background": "ruined fortress battlefield background with sparks and smoke",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wei_zhangliao",
+        "name": "张辽",
+        "inspiration": "Zhang Liao",
+        "age": 26,
+        "face": "cool elite raider beauty, sharp gray eyes, focused expression",
+        "hair": "dark blue-black hair in a high military ponytail with silver clips",
+        "body": "lean curvy body with a fast cavalry silhouette",
+        "outfit": "black thigh-high stockings, steel garters, light shoulder cape, twin hooked blades",
+        "pose": "mid-stride raider pose on a city wall, one blade held low, the other raised near shoulder, torso twisting as if turning after a sudden strike, cool direct stare",
+        "background": "night city wall background with torchlight and distant banners",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wei_xuchu",
+        "name": "许褚",
+        "inspiration": "Xu Chu",
+        "age": 31,
+        "face": "powerful guardian beauty, strong cheekbones, confident grin",
+        "hair": "thick auburn hair in a heavy braid with a bronze tiger hair ornament",
+        "body": "muscular curvy body with a protective bodyguard silhouette",
+        "outfit": "leather garter straps, fur mantle, massive war hammer resting nearby",
+        "pose": "kneeling on one knee in a dominant bodyguard pose, one arm resting across the hammer handle, the other hand tightening a wrist guard, shoulders squared, direct protective stare",
+        "background": "palace guard courtyard background with warm sunset light",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wei_guojia",
+        "name": "郭嘉",
+        "inspiration": "Guo Jia",
+        "age": 27,
+        "face": "fragile genius beauty, dreamy dark eyes, pale complexion",
+        "hair": "long soft ash-brown hair loose over one shoulder with small wine-red ribbons",
+        "body": "slim curvy body with a relaxed scholar silhouette",
+        "outfit": "sheer black thigh-high stockings, wine-red garters, jade cup and scroll",
+        "pose": "reclining sideways on a low couch covered with silk, one elbow propping her upper body, one hand holding a wine cup, legs elegantly angled and fully covered, dreamy clever smile; a feather teasing wand rests on the table as a decorative boudoir prop, not being used",
+        "background": "private study background with scrolls and candlelight",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wei_zhenji",
+        "name": "甄姬",
+        "inspiration": "Zhen Ji",
+        "age": 25,
+        "face": "ethereal noble beauty, luminous dark eyes, porcelain skin",
+        "hair": "long flowing black hair with pearl and blue flower ornaments",
+        "body": "graceful curvy body with a water-dancer silhouette",
+        "outfit": "white lace thigh-high stockings, pearl garters, delicate anklets",
+        "pose": "elegant dance pose on shallow palace water, one arm raised with sleeve flowing above her head, the other hand near her waist, torso curved, serene alluring gaze",
+        "background": "moonlit lotus pond palace background with blue mist and reflections",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wu_sunquan",
+        "name": "孙权",
+        "inspiration": "Sun Quan",
+        "age": 28,
+        "face": "young sovereign beauty, bright green-brown eyes, composed confident smile",
+        "hair": "long chestnut hair in a regal side braid with turquoise and gold crown pieces",
+        "body": "curvy royal body with a composed river-king silhouette",
+        "outfit": "black thigh-high stockings, gold garters, broad royal cape, curved sword",
+        "pose": "standing on a ship deck with one boot on a coiled rope, one hand resting on the sword pommel, the other hand pointing toward the horizon, hips angled in a confident ruler silhouette",
+        "background": "Jiangdong warship background with river mist, banners, and sunrise light",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wu_ganning",
+        "name": "甘宁",
+        "inspiration": "Gan Ning",
+        "age": 26,
+        "face": "rebellious pirate beauty, mischievous sharp eyes, confident smirk",
+        "hair": "short black hair with wet copper highlights and small golden bells",
+        "body": "athletic curvy body with a dangerous river-raider silhouette",
+        "outfit": "short leather skirt over silk panels, black thigh-high stockings, red garter straps, bell ornaments, curved saber",
+        "pose": "standing with one foot on a treasure chest, saber resting across her shoulders behind her neck, torso angled, playful dangerous grin, wet cloak flowing behind",
+        "background": "river dock at night background with lanterns, rain shine, and moored warboats",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wu_lvmeng",
+        "name": "吕蒙",
+        "inspiration": "Lu Meng",
+        "age": 33,
+        "face": "disciplined scholar-warrior beauty, calm dark eyes, mature restrained expression",
+        "hair": "straight dark green-black hair in a low ponytail with simple bronze clips",
+        "body": "mature curvy body with a restrained commander silhouette",
+        "outfit": "black opaque thigh-high stockings, bronze garters, tactical map scrolls, sheathed sword",
+        "pose": "standing beside a campaign table, one hand pressing down a map marker, the other hand holding a closed book against her hip, posture straight and composed, subtle confident gaze",
+        "background": "quiet military study tent background with maps, oil lamps, and folded banners",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wu_huanggai",
+        "name": "黄盖",
+        "inspiration": "Huang Gai",
+        "age": 39,
+        "face": "weathered veteran beauty, tanned skin, stern eyes, confident mature mouth",
+        "hair": "dark brown hair with bronze streaks tied in a rough veteran knot",
+        "body": "strong mature curvy body with veteran toughness",
+        "outfit": "black thigh-high stockings, leather garters, scarred shoulder cloak, heavy chain whip",
+        "pose": "standing near a burning warship rail, one hand gripping a chain whip, the other pulling a cloak over one shoulder, torso angled in a defiant mature stance, intense battle-worn gaze",
+        "background": "Red Cliff naval battlefield background with firelight, smoke, and river sparks",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wu_zhouyu",
+        "name": "周瑜",
+        "inspiration": "Zhou Yu",
+        "age": 27,
+        "face": "brilliant glamorous commander beauty, elegant brows, confident eyes",
+        "hair": "long wine-red hair flowing loose with gold music-note ornaments",
+        "body": "graceful curvy body with dancer-like command presence",
+        "outfit": "white thigh-high stockings, red garters, ornate qin instrument and command baton",
+        "pose": "standing in a flowing dancer-conductor pose, one hand raised as if directing music and battle, the other touching the strings of a qin on a stand, torso arched elegantly, charming confident smile",
+        "background": "Red Cliff command pavilion background with river fire in distance and romantic red-gold light",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wu_daqiao",
+        "name": "大乔",
+        "inspiration": "Da Qiao",
+        "age": 25,
+        "face": "graceful noble beauty, soft heart-shaped face, gentle dark eyes",
+        "hair": "long silky black hair in two elegant low loops with floral hairpins",
+        "body": "delicate curvy body with soft noble posture",
+        "outfit": "white lace thigh-high stockings, pearl garters, folding fan",
+        "pose": "side-sitting pose on a moon bridge railing with legs together and angled downward, one hand holding a folding fan near her shoulder, the other hand gathering flowing silk, gentle protective expression",
+        "background": "blooming garden bridge background with soft romantic light",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wu_luxun",
+        "name": "陆逊",
+        "inspiration": "Lu Xun",
+        "age": 24,
+        "face": "elegant young adult strategist, calm clever eyes, refined face",
+        "hair": "long dark teal hair in a loose side ponytail with book charms",
+        "body": "slim curvy body with a clean scholar silhouette",
+        "outfit": "sheer black thigh-high stockings, teal garter straps, scroll case, small flame talisman",
+        "pose": "kneeling calligraphy pose on a woven mat, one hand writing on a tactical scroll, the other hand holding a small fan near her chest, gaze lifted from the page toward viewer",
+        "background": "bamboo command tent background with soft green light and paper lanterns",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "wu_sunshangxiang",
+        "name": "孙尚香",
+        "inspiration": "Sun Shangxiang",
+        "age": 24,
+        "face": "energetic royal warrior beauty, bright confident eyes, small sharp smile",
+        "hair": "high twin ponytails with red-gold ribbons",
+        "body": "athletic curvy body with a lively princess-warrior silhouette",
+        "outfit": "black thigh-high stockings, red garters, ornate arm guards, bow and quiver",
+        "pose": "archer draw pose with bow aimed diagonally upward away from the viewer, torso twisted, one leg forward, playful fierce expression, hair ribbons flying",
+        "background": "palace training yard background with vivid daylight",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "qun_huatuo",
+        "name": "华佗",
+        "inspiration": "Hua Tuo",
+        "age": 35,
+        "face": "mature healer beauty, gentle knowing eyes, soft lips",
+        "hair": "long black hair loosely tied with green herbal ribbons and wooden hairpins",
+        "body": "mature curvy body with a calm healer silhouette",
+        "outfit": "opaque sleeves over translucent lining, short layered robe skirt, sheer white thigh-high stockings, green garters, medicine pouch, acupuncture case",
+        "pose": "sitting sideways on a wooden medicine bench, one hand holding a porcelain medicine bowl, the other arranging herbs on a tray, calm intimate gaze; a decorative silk blindfold and closed lacquered prop box rest on a shelf as background details, not being used",
+        "background": "herbal clinic background with hanging plants and warm lanterns",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "qun_lvbu",
+        "name": "吕布",
+        "inspiration": "Lu Bu",
+        "age": 30,
+        "face": "dominant terrifying beauty, sharp red-brown eyes, fierce angular face",
+        "hair": "long black hair with crimson streaks in a high wild ponytail and a horn-like gold headpiece",
+        "body": "tall powerful curvy body with an aggressive cavalry silhouette",
+        "outfit": "black thigh-high stockings, red leather garters, metal ornaments, massive halberd",
+        "pose": "dominant battlefield stance with one boot on a broken shield, halberd planted vertically beside her, one hand holding a coiled riding crop at her hip as a commander prop, not being used, fierce unstoppable gaze",
+        "background": "chaotic battlefield background with red lightning and smoke",
+        "bust": "exposed nipples and genitals ",
+    },
+    {
+        "id": "qun_diaochan",
+        "name": "貂蝉",
+        "inspiration": "Diao Chan",
+        "age": 25,
+        "face": "seductive dancer beauty, delicate face, long lashes, violet eyes, soft confident smile",
+        "hair": "very long black hair in an ornate flowing dancer style with silver flower ornaments",
+        "body": "graceful curvy body with a fluid dancer silhouette",
+        "outfit": "purple and pink dancer outfit, translucent corset, translucent silk ribbons over opaque panels, sheer black thigh-high stockings, silver garter chains, silk dance fans",
+        "pose": "spinning dance pose with one arm above her head and the other sweeping a fan outward, waist curved, one leg extended in an elegant dancer line, romantic teasing gaze",
+        "background": "moonlit palace stage background with decorative silk ribbons and a feather teasing wand placed on a nearby vanity as background props, not being used",
+        "bust": "exposed nipples and genitals ",
+    },
+]
+
+
+
+
+def prompt_text(general: dict) -> str:
+    format_values = {"cleavage": "exposed cleavage", **general}
+    positive = COMMON_STYLE.format(**format_values)
+    target = GENERAL_OUTPUT_DIR / f"{general['id']}.png"
+    relative_target = target.relative_to(ROOT).as_posix()
+    return "\n".join(
+        [
+            f"# {general['id']} / {general['name']}",
+            f"Target output: {relative_target}",
+            "",
+            "Positive prompt:",
+            positive,
+            "",
+            "Bust and silhouette variation:",
+            general["bust"],
+            "",
+            "Negative prompt:",
+            NEGATIVE_PROMPT,
+            "",
+        ]
+    )
+
+
+def main() -> None:
+    PROMPT_DIR.mkdir(parents=True, exist_ok=True)
+    for general in GENERALS:
+        path = PROMPT_DIR / f"{general['id']}.txt"
+        path.write_text(prompt_text(general), encoding="utf-8", newline="\n")
+    print(f"Generated {len(GENERALS)} Sanguosha adult-female general prompt files in {PROMPT_DIR}.")
+
+
+if __name__ == "__main__":
+    main()
