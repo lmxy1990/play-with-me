@@ -24,11 +24,22 @@ function Assert-ExternalSuccess {
 function Get-TagCommit {
     param([string]$TagName)
 
-    $commit = & git rev-list -n 1 $TagName 2>$null
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($commit | Out-String))) {
+    $refName = "refs/tags/$TagName"
+    $tagInfo = & git for-each-ref --format="%(objectname)|%(*objectname)" $refName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to inspect git tag $TagName."
+    }
+
+    $tagText = (($tagInfo | Select-Object -First 1 | Out-String).Trim())
+    if ([string]::IsNullOrWhiteSpace($tagText)) {
         return $null
     }
-    return (($commit | Out-String).Trim())
+
+    $parts = $tagText -split "\|", 2
+    if ($parts.Length -ge 2 -and -not [string]::IsNullOrWhiteSpace($parts[1])) {
+        return $parts[1].Trim()
+    }
+    return $parts[0].Trim()
 }
 
 function Test-GhReleaseExists {
