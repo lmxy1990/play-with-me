@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="800" viewBox="0 0 720 800">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2d49b"/>
+      <stop offset="0.52" stop-color="#d6a566"/>
+      <stop offset="1" stop-color="#b8753e"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7d3f20"/>
+      <stop offset="1" stop-color="#4d2616"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-18%" width="136%" height="136%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#170a04" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect x="22" y="22" width="676" height="756" rx="20" fill="url(#rim)" filter="url(#shadow)"/>
+  <rect x="42" y="42" width="636" height="716" rx="12" fill="url(#paper)"/>
+  <rect x="76" y="76" width="568" height="648" fill="none" stroke="#4f2412" stroke-width="4"/>
+  <g stroke="#5b2a15" stroke-width="2.4" stroke-linecap="round">
+    <path d="M147 76 V364 M147 436 V724"/>
+    <path d="M218 76 V364 M218 436 V724"/>
+    <path d="M289 76 V364 M289 436 V724"/>
+    <path d="M360 76 V724"/>
+    <path d="M431 76 V364 M431 436 V724"/>
+    <path d="M502 76 V364 M502 436 V724"/>
+    <path d="M573 76 V364 M573 436 V724"/>
+    <path d="M76 148 H644"/>
+    <path d="M76 220 H644"/>
+    <path d="M76 292 H644"/>
+    <path d="M76 364 H644"/>
+    <path d="M76 436 H644"/>
+    <path d="M76 508 H644"/>
+    <path d="M76 580 H644"/>
+    <path d="M76 652 H644"/>
+  </g>
+  <g stroke="#5b2a15" stroke-width="2.4" stroke-linecap="round">
+    <path d="M289 76 L431 220 M431 76 L289 220"/>
+    <path d="M289 580 L431 724 M431 580 L289 724"/>
+  </g>
+  <rect x="78" y="366" width="564" height="68" fill="#d9ab6f" opacity="0.92"/>
+  <text x="225" y="410" font-family="serif" font-size="30" fill="#5c2b16" opacity="0.72" letter-spacing="9">楚 河</text>
+  <text x="402" y="410" font-family="serif" font-size="30" fill="#5c2b16" opacity="0.72" letter-spacing="9">汉 界</text>
+  <g stroke="#5b2a15" stroke-width="2" opacity="0.75">
+    <path d="M137 210 h20 M147 200 v20 M208 210 h20 M218 200 v20 M279 210 h20 M289 200 v20 M421 210 h20 M431 200 v20 M492 210 h20 M502 200 v20 M563 210 h20 M573 200 v20"/>
+    <path d="M137 570 h20 M147 560 v20 M208 570 h20 M218 560 v20 M279 570 h20 M289 560 v20 M421 570 h20 M431 560 v20 M492 570 h20 M502 560 v20 M563 570 h20 M573 560 v20"/>
+  </g>
+</svg>
