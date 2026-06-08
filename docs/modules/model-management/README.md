@@ -6,7 +6,7 @@
 
 模型推理能力像一个业务无关的 I/O 黑盒：调用方提供完整模型配置、消息、输出类型、结构兼容、思考兼容和传输模式，模块负责组装不同供应商请求并返回文本、诊断事件、用量和结构化错误。它不理解机器人记忆、具体游戏房间玩法、AI 机器人玩家策略或 TTS 播放。
 
-跨模块对象 `ModelGenerationRequest` 和 `ModelGenerationResult` 的字段权威见 [跨模块契约](../../contracts/README.md)。本文保留模型配置、供应商调用和模块内部流程说明。
+跨模块对象 `ModelGenerationRequest` 和 `ModelGenerationResult` 的字段权威见 [跨模块契约](../../contracts/README.md)。强制 JSON 输出的多协议适配细节见 [强制 JSON 多协议兼容策略](forced-json-compatibility.md)。本文保留模型配置、供应商调用和模块内部流程说明。
 
 ## 模块定位
 
