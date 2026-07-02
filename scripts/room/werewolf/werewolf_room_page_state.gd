@@ -117,12 +117,40 @@ func _interaction_status_text() -> String:
 		var reason := String(_werewolf.get("pause_reason", "")).strip_edges()
 		return "游戏暂停：%s" % (reason if reason != "" else "等待真人玩家重连")
 	if _pending_action != "":
-		return "%s · %s：%s" % [_phase_status_text(), _player_title(_pending_actor_index), _pending_action]
+		var actor_text := _pending_actor_title_for_current_view()
+		if actor_text != "":
+			return "%s · %s：%s" % [_phase_status_text(), actor_text, _pending_action]
+		return "%s · %s" % [_phase_status_text(), _pending_action]
 	if _speech_prompt_index >= 0:
-		return "%s · %s 发言" % [_phase_status_text(), _player_title(_speech_prompt_index)]
+		var speaker_text := _speech_speaker_title_for_current_view()
+		if speaker_text != "":
+			return "%s · %s 发言" % [_phase_status_text(), speaker_text]
+		return "%s · 发言中" % _phase_status_text()
 	if _is_game_started():
 		return "%s · 等待主持人推进" % _phase_status_text()
 	return "真人准备后房主开始"
+
+
+# 左上角 HUD 必须与座位卡片使用同一套可见性过滤，否则会在夜间泄露行动者身份
+# （例如「第1夜 · 狼人行动 · 4号 张三：投刀」直接暴露狼人座位）。
+# 这里复用 _seat_state_visible_to_current()：夜间狼刀仅狼队可见，守卫/预言家/女巫
+# 行动仅行动者本人与观战者可见，与座位卡片的过滤逻辑保持一致。
+func _pending_actor_title_for_current_view() -> String:
+	var actor_index := _pending_actor_index
+	if actor_index < 0:
+		return _player_title(actor_index)
+	if _seat_state_visible_to_current(actor_index):
+		return _player_title(actor_index)
+	return ""
+
+
+func _speech_speaker_title_for_current_view() -> String:
+	var speaker_index := _speech_prompt_index
+	if speaker_index < 0:
+		return ""
+	if _seat_state_visible_to_current(speaker_index):
+		return _player_title(speaker_index)
+	return ""
 
 
 func _human_count() -> int:
